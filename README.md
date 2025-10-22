@@ -210,6 +210,63 @@ Query parameters are parsed into the component struct, just like POST form data.
 - Server-side rendering of initial state
 - Progressive enhancement patterns
 
+## Component Processing
+
+Components can implement the `Processor` interface to perform business logic, validation, or data transformation after form decoding but before rendering.
+
+### The Processor Interface
+
+```go
+type Processor interface {
+    Process() error
+}
+```
+
+The registry automatically calls `Process()` if your component implements this interface:
+
+```go
+type LoginForm struct {
+    Username   string `form:"username"`
+    Password   string `form:"password"`
+    RedirectTo string `json:"-"`
+    Error      string `json:"-"`
+}
+
+// Implement Processor interface
+func (f *LoginForm) Process() error {
+    if f.Username == "demo" && f.Password == "password" {
+        f.RedirectTo = "/dashboard"  // This will trigger HX-Redirect
+        return nil
+    }
+    f.Error = "Invalid credentials"
+    return nil
+}
+
+// Implement response header interface
+func (f *LoginForm) GetHxRedirect() string {
+    return f.RedirectTo
+}
+```
+
+**Processing Flow:**
+1. Form data decoded into struct
+2. Request headers applied (HX-Boosted, HX-Request, etc.)
+3. **`Process()` called** (if interface implemented)
+4. Response headers applied (HX-Redirect, HX-Trigger, etc.)
+5. Component rendered
+
+**When to Use:**
+- Form validation
+- Authentication/authorization
+- Database operations
+- Setting conditional response headers
+- Business logic that affects rendering
+
+**Error Handling:**
+- Return `error` only for unexpected system failures
+- Store validation errors in struct fields for rendering
+- Example: `f.Error = "Invalid input"` instead of `return err`
+
 ## Advanced Examples
 
 ### Login Component with Redirect

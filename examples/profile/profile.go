@@ -15,8 +15,10 @@ func (u *UserProfile) GetHxLocation() string {
 	return u.LocationURL
 }
 
-// ProcessUpdate simulates profile update logic.
-func (u *UserProfile) ProcessUpdate() error {
+// Process implements the Processor interface to handle profile update logic.
+// This is called automatically by the registry after form decoding
+// and before rendering the component.
+func (u *UserProfile) Process() error {
 	// Simple validation
 	if u.Name == "" || u.Email == "" {
 		return nil

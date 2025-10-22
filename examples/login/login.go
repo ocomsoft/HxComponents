@@ -21,9 +21,10 @@ func (f *LoginForm) GetHxRefresh() bool {
 	return f.Refresh
 }
 
-// ProcessLogin simulates login logic. In a real application, this would
-// query a database and validate credentials.
-func (f *LoginForm) ProcessLogin() error {
+// Process implements the Processor interface to handle login logic.
+// This is called automatically by the registry after form decoding
+// and before rendering the component.
+func (f *LoginForm) Process() error {
 	// Simple validation for demo purposes
 	if f.Username == "" || f.Password == "" {
 		f.Error = "Username and password are required"

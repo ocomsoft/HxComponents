@@ -34,14 +34,20 @@ func NewRegistry() *Registry {
 // The name parameter is used in the URL path: /component/{name}
 // The render function takes a typed instance and returns a templ.Component.
 //
+// If the component type implements the Processor interface, its Process() method
+// will be called after form decoding and before rendering, allowing you to perform
+// validation, business logic, or set response headers.
+//
 // Example:
 //
-//	registry.Register("search", SearchComponent)
+//	components.Register(registry, "search", SearchComponent)
 func Register[T any](r *Registry, name string, render func(T) templ.Component) {
 	r.components[name] = componentEntry{
 		structType: reflect.TypeOf((*T)(nil)).Elem(),
 		render: func(v interface{}) templ.Component {
-			return render(v.(T))
+			// Convert pointer to value for render function
+			ptr := v.(*T)
+			return render(*ptr)
 		},
 	}
 }
@@ -103,12 +109,20 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	// Apply request headers
 	applyHxHeaders(instance.Interface(), req)
 
-	// Apply response headers BEFORE rendering
+	// Call Process if the component implements the Processor interface
+	if processor, ok := instance.Interface().(Processor); ok {
+		if err := processor.Process(); err != nil {
+			http.Error(w, fmt.Sprintf("process error: %v", err), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Apply response headers (after processing, so we capture any changes made during Process)
 	applyHxResponseHeaders(w, instance.Interface())
 
 	// Render component
 	w.Header().Set("Content-Type", "text/html")
-	component := entry.render(instance.Elem().Interface())
+	component := entry.render(instance.Interface())
 	if err := component.Render(req.Context(), w); err != nil {
 		http.Error(w, fmt.Sprintf("render error: %v", err), http.StatusInternalServerError)
 		return

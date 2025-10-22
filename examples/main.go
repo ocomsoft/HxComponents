@@ -18,17 +18,10 @@ func main() {
 	registry := components.NewRegistry()
 
 	// Register components
+	// The registry will automatically call Process() if the component implements the Processor interface
 	components.Register(registry, "search", search.SearchComponent)
-	components.Register(registry, "login", func(data login.LoginForm) templ.Component {
-		// Process login before rendering
-		data.ProcessLogin()
-		return login.LoginComponent(data)
-	})
-	components.Register(registry, "profile", func(data profile.UserProfile) templ.Component {
-		// Process profile update before rendering
-		data.ProcessUpdate()
-		return profile.ProfileComponent(data)
-	})
+	components.Register(registry, "login", login.LoginComponent)
+	components.Register(registry, "profile", profile.ProfileComponent)
 
 	// Setup router
 	router := chi.NewRouter()
@@ -40,6 +33,7 @@ func main() {
 
 	// Serve static files and demo page
 	router.Get("/", serveHomePage)
+	router.Get("/dashboard", serveDashboardPage)
 
 	log.Println("Server starting on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -48,6 +42,11 @@ func main() {
 func serveHomePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(indexHTML))
+}
+
+func serveDashboardPage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(dashboardHTML))
 }
 
 const indexHTML = `<!DOCTYPE html>
@@ -253,6 +252,61 @@ const indexHTML = `<!DOCTYPE html>
             <li><strong>POST</strong> - Standard HTMX pattern for form submissions with form data in request body</li>
             <li><strong>GET</strong> - Useful for loading components with initial state via query parameters (e.g., <code>/component/search?q=golang&limit=5</code>)</li>
         </ul>
+    </div>
+</body>
+</html>`
+
+const dashboardHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - HTMX Component Registry</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #28a745;
+            padding-bottom: 10px;
+        }
+        .success-message {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the Dashboard!</h1>
+        <div class="success-message">
+            <strong>Success!</strong> You have been redirected here via the HX-Redirect response header.
+        </div>
+        <p>This page demonstrates that the HTMX redirect from the login component worked successfully.</p>
+        <p>The login component set the <code>HX-Redirect</code> header to <code>/dashboard</code>, and HTMX automatically performed a client-side redirect to this page.</p>
+        <p><a href="/">← Back to Demo Page</a></p>
     </div>
 </body>
 </html>`
