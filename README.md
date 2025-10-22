@@ -88,6 +88,18 @@ func main() {
 <div id="results"></div>
 ```
 
+**5. Or use with GET for initial state:**
+
+```html
+<!-- Load component with query parameters -->
+<div hx-get="/component/search?q=golang&limit=5" hx-trigger="load" hx-target="this"></div>
+
+<!-- Or via a link/button -->
+<button hx-get="/component/search?q=htmx&limit=10" hx-target="#results">
+    Load Search Results
+</button>
+```
+
 ## HTMX Request Headers
 
 Capture HTMX request headers by implementing optional interfaces:
@@ -146,6 +158,57 @@ func (f *LoginForm) GetHxRedirect() string {
 | `HxTriggerResponse` | HX-Trigger | string |
 | `HxTriggerAfterSettleResponse` | HX-Trigger-After-Settle | string |
 | `HxTriggerAfterSwapResponse` | HX-Trigger-After-Swap | string |
+
+## GET vs POST Requests
+
+The registry supports both GET and POST requests for maximum flexibility:
+
+### POST Requests (Standard Pattern)
+
+POST is the standard HTMX pattern for form submissions:
+
+```html
+<form hx-post="/component/search" hx-target="#results">
+    <input type="text" name="q" value="htmx" />
+    <button>Search</button>
+</form>
+```
+
+Form data is sent in the request body and parsed into the component struct.
+
+### GET Requests (Initial State)
+
+GET requests are useful for loading components with initial state or query parameters:
+
+```html
+<!-- Load on page load -->
+<div hx-get="/component/search?q=golang&limit=5"
+     hx-trigger="load"
+     hx-target="this">
+</div>
+
+<!-- Load on click -->
+<button hx-get="/component/search?q=htmx&limit=10"
+        hx-target="#results">
+    Load Popular Searches
+</button>
+
+<!-- Preload with hx-boost -->
+<a href="/component/search?q=go&limit=20"
+   hx-boost="true"
+   hx-target="#results">
+    Go Results
+</a>
+```
+
+Query parameters are parsed into the component struct, just like POST form data.
+
+**Use Cases for GET:**
+- Loading components with default/initial values
+- Deep-linking to specific component states
+- Shareable URLs with query parameters
+- Server-side rendering of initial state
+- Progressive enhancement patterns
 
 ## Advanced Examples
 

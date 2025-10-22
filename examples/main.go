@@ -174,7 +174,9 @@ const indexHTML = `<!DOCTYPE html>
             <li><strong>Search:</strong> Demonstrates request header capture (HX-Boosted, HX-Request, etc.)</li>
             <li><strong>Login:</strong> Demonstrates response headers (HX-Redirect) - Use username: <code>demo</code>, password: <code>password</code></li>
             <li><strong>Profile:</strong> Demonstrates complex form data with arrays</li>
+            <li><strong>GET Support:</strong> Components can be loaded via GET requests with query parameters - <a href="#" hx-get="/component/search?q=golang&limit=5" hx-target="#get-demo" style="color: #007bff; text-decoration: underline;">Click here to demo</a></li>
         </ul>
+        <div id="get-demo" class="result" style="margin-top: 15px;"></div>
     </div>
 
     <div class="grid">
@@ -239,13 +241,18 @@ const indexHTML = `<!DOCTYPE html>
         <h2>How It Works</h2>
         <p>Each component above is registered in the Go component registry with type-safe form binding and HTMX header handling:</p>
         <ol>
-            <li>Forms submit to <code>/component/{component_name}</code></li>
-            <li>The registry parses form data into typed structs</li>
+            <li>Forms submit to <code>/component/{component_name}</code> via POST or GET</li>
+            <li>The registry parses form data (POST) or query parameters (GET) into typed structs</li>
             <li>HTMX request headers are automatically captured (if component implements interfaces)</li>
             <li>Component logic executes (validation, business logic, etc.)</li>
             <li>HTMX response headers are set (redirects, triggers, etc.)</li>
             <li>Template is rendered and returned to the target element</li>
         </ol>
+        <p><strong>GET vs POST:</strong></p>
+        <ul>
+            <li><strong>POST</strong> - Standard HTMX pattern for form submissions with form data in request body</li>
+            <li><strong>GET</strong> - Useful for loading components with initial state via query parameters (e.g., <code>/component/search?q=golang&limit=5</code>)</li>
+        </ul>
     </div>
 </body>
 </html>`

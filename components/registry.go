@@ -6,8 +6,8 @@ import (
 	"reflect"
 
 	"github.com/a-h/templ"
-	"github.com/go-playground/form/v4"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/form/v4"
 )
 
 var decoder = form.NewDecoder()
@@ -53,13 +53,21 @@ func (r *Registry) Register(name string, render interface{}) {
 	panic("Use components.Register[T](registry, name, renderFunc) instead of registry.Register()")
 }
 
-// Handler handles POST requests for component rendering.
-// It expects the component name as a URL parameter "component_name".
-// The form data is parsed and bound to the registered component type.
-// HTMX request headers are applied if the component implements the appropriate interfaces.
-// HTMX response headers are set if the component implements the appropriate interfaces.
+// Handler handles GET and POST requests for component rendering.
+// For POST requests:
+//   - The component name is expected as a URL parameter "component_name"
+//   - Form data is parsed and bound to the registered component type
+//   - HTMX request headers are applied if the component implements the appropriate interfaces
+//   - HTMX response headers are set if the component implements the appropriate interfaces
+//
+// For GET requests:
+//   - The component name is expected as a URL parameter "component_name"
+//   - Query parameters are parsed and bound to the registered component type
+//   - HTMX request headers are applied if the component implements the appropriate interfaces
+//   - HTMX response headers are set if the component implements the appropriate interfaces
+//   - Useful for rendering components with default/initial state
 func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
+	if req.Method != http.MethodPost && req.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -78,7 +86,16 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 
 	// Create instance and decode form
 	instance := reflect.New(entry.structType)
-	if err := decoder.Decode(instance.Interface(), req.PostForm); err != nil {
+
+	// For POST, use PostForm; for GET, use Form (which includes query params)
+	var formData map[string][]string
+	if req.Method == http.MethodPost {
+		formData = req.PostForm
+	} else {
+		formData = req.Form
+	}
+
+	if err := decoder.Decode(instance.Interface(), formData); err != nil {
 		http.Error(w, fmt.Sprintf("decode error: %v", err), http.StatusBadRequest)
 		return
 	}
@@ -92,10 +109,16 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	// Render component
 	w.Header().Set("Content-Type", "text/html")
 	component := entry.render(instance.Elem().Interface())
-	component.Render(req.Context(), w)
+	if err := component.Render(req.Context(), w); err != nil {
+		http.Error(w, fmt.Sprintf("render error: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
-// Mount registers the handler with the chi router at POST /component/{component_name}.
+// Mount registers the handler with the chi router at GET and POST /component/{component_name}.
+// GET requests are useful for rendering components with initial/default state or query parameters.
+// POST requests are the standard HTMX pattern for form submissions.
 func (r *Registry) Mount(router *chi.Mux) {
+	router.Get("/component/{component_name}", r.Handler)
 	router.Post("/component/{component_name}", r.Handler)
 }
