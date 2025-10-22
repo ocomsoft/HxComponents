@@ -1,0 +1,21 @@
+package login
+
+templ LoginComponent(data LoginForm) {
+	<div class="login-result">
+		if data.Error != "" {
+			<div class="alert alert-danger">
+				{ data.Error }
+			</div>
+		}
+		if data.RedirectTo != "" {
+			<div class="alert alert-success">
+				Login successful! Redirecting to dashboard...
+			</div>
+		}
+		if data.Error == "" && data.RedirectTo == "" {
+			<div class="alert alert-info">
+				Processing login...
+			</div>
+		}
+	</div>
+}
