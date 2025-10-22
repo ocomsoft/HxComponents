@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"reflect"
 
@@ -18,15 +19,37 @@ type componentEntry struct {
 	render     func(interface{}) templ.Component
 }
 
+// ErrorHandler is a function that renders error responses
+type ErrorHandler func(w http.ResponseWriter, req *http.Request, title string, message string, code int)
+
 // Registry manages component registration and handles HTTP requests for component rendering.
 type Registry struct {
-	components map[string]componentEntry
+	components   map[string]componentEntry
+	errorHandler ErrorHandler
 }
 
-// NewRegistry creates a new component registry.
+// NewRegistry creates a new component registry with the default error handler.
 func NewRegistry() *Registry {
 	return &Registry{
-		components: make(map[string]componentEntry),
+		components:   make(map[string]componentEntry),
+		errorHandler: defaultErrorHandler,
+	}
+}
+
+// SetErrorHandler sets a custom error handler for the registry.
+// The error handler is responsible for rendering error responses.
+func (r *Registry) SetErrorHandler(handler ErrorHandler) {
+	r.errorHandler = handler
+}
+
+// defaultErrorHandler is the default error handler that renders the ErrorComponent
+func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string, message string, code int) {
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(code)
+	if err := ErrorComponent(title, message, code).Render(req.Context(), w); err != nil {
+		slog.Error("failed to render error component", "error", err)
+		// Fallback to plain text error
+		fmt.Fprintf(w, "<div>%s: %s (Code: %d)</div>", title, message, code)
 	}
 }
 
@@ -40,7 +63,7 @@ func NewRegistry() *Registry {
 //
 // Example:
 //
-//	components.Register(registry, "search", SearchComponent)
+//	components.Register(registry, "search", Search)
 func Register[T any](r *Registry, name string, render func(T) templ.Component) {
 	r.components[name] = componentEntry{
 		structType: reflect.TypeOf((*T)(nil)).Elem(),
@@ -50,13 +73,6 @@ func Register[T any](r *Registry, name string, render func(T) templ.Component) {
 			return render(*ptr)
 		},
 	}
-}
-
-// Register is a convenience method that calls the package-level Register function.
-func (r *Registry) Register(name string, render interface{}) {
-	// This method is intentionally left generic to allow type inference
-	// Users should use the package-level Register function for type safety
-	panic("Use components.Register[T](registry, name, renderFunc) instead of registry.Register()")
 }
 
 // Handler handles GET and POST requests for component rendering.
@@ -74,19 +90,32 @@ func (r *Registry) Register(name string, render interface{}) {
 //   - Useful for rendering components with default/initial state
 func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost && req.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		slog.Warn("method not allowed",
+			"method", req.Method,
+			"path", req.URL.Path)
+		r.renderError(w, req, "Method Not Allowed", fmt.Sprintf("Method %s is not allowed", req.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
 	componentName := chi.URLParam(req, "component_name")
 	entry, exists := r.components[componentName]
 	if !exists {
-		http.Error(w, "component not found", http.StatusNotFound)
+		slog.Warn("component not found",
+			"component", componentName,
+			"path", req.URL.Path)
+		r.renderError(w, req, "Component Not Found", fmt.Sprintf("Component '%s' not found", componentName), http.StatusNotFound)
 		return
 	}
 
+	slog.Debug("rendering component",
+		"component", componentName,
+		"method", req.Method)
+
 	if err := req.ParseForm(); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		slog.Error("form parse error",
+			"component", componentName,
+			"error", err)
+		r.renderError(w, req, "Bad Request", fmt.Sprintf("Failed to parse form data: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -102,7 +131,10 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if err := decoder.Decode(instance.Interface(), formData); err != nil {
-		http.Error(w, fmt.Sprintf("decode error: %v", err), http.StatusBadRequest)
+		slog.Error("form decode error",
+			"component", componentName,
+			"error", err)
+		r.renderError(w, req, "Decode Error", fmt.Sprintf("Failed to decode form data: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -112,7 +144,10 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	// Call Process if the component implements the Processor interface
 	if processor, ok := instance.Interface().(Processor); ok {
 		if err := processor.Process(); err != nil {
-			http.Error(w, fmt.Sprintf("process error: %v", err), http.StatusInternalServerError)
+			slog.Error("component process error",
+				"component", componentName,
+				"error", err)
+			r.renderError(w, req, "Processing Error", fmt.Sprintf("Component processing failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -124,9 +159,20 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	component := entry.render(instance.Interface())
 	if err := component.Render(req.Context(), w); err != nil {
-		http.Error(w, fmt.Sprintf("render error: %v", err), http.StatusInternalServerError)
+		slog.Error("component render error",
+			"component", componentName,
+			"error", err)
+		r.renderError(w, req, "Render Error", fmt.Sprintf("Component rendering failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	slog.Debug("component rendered successfully",
+		"component", componentName)
+}
+
+// renderError renders error responses using the configured error handler
+func (r *Registry) renderError(w http.ResponseWriter, req *http.Request, title string, message string, code int) {
+	r.errorHandler(w, req, title, message, code)
 }
 
 // Mount registers the handler with the chi router at GET and POST /component/{component_name}.

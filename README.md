@@ -409,6 +409,61 @@ Mounts the registry handler to chi router at `/component/{component_name}`.
 #### `Handler(w http.ResponseWriter, req *http.Request)`
 HTTP handler for component rendering. Can be used with any router.
 
+#### `SetErrorHandler(handler ErrorHandler)`
+Sets a custom error handler for rendering error responses.
+
+**Example:**
+
+```go
+registry.SetErrorHandler(func(w http.ResponseWriter, req *http.Request, title string, message string, code int) {
+    // Custom error rendering with your own template
+    w.Header().Set("Content-Type", "text/html")
+    w.WriteHeader(code)
+    MyErrorTemplate(title, message, code).Render(req.Context(), w)
+})
+```
+
+## Logging
+
+The registry uses Go's standard `log/slog` for structured logging. Configure your logger before starting the server:
+
+```go
+import "log/slog"
+
+// Set log level to debug to see component rendering logs
+slog.SetLogLoggerLevel(slog.LevelDebug)
+
+// Or use a custom handler
+handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+    Level: slog.LevelInfo,
+})
+slog.SetDefault(slog.New(handler))
+```
+
+**Logged Events:**
+- `Debug` - Component rendering started and completed
+- `Warn` - Method not allowed, component not found
+- `Error` - Form parse/decode errors, process errors, render errors
+
+## Error Handling
+
+The registry provides a customizable error handler for rendering error responses. By default, it uses the built-in `ErrorComponent` template.
+
+**Default Error Component:**
+
+```go
+ErrorComponent(title string, message string, code int)
+```
+
+**Custom Error Handler:**
+
+```go
+type ErrorHandler func(w http.ResponseWriter, req *http.Request, title string, message string, code int)
+
+registry := components.NewRegistry()
+registry.SetErrorHandler(myCustomErrorHandler)
+```
+
 ## Best Practices
 
 ### 1. Use Descriptive Component Names
