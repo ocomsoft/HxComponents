@@ -1,0 +1,22 @@
+package profile
+
+import "strings"
+
+templ ProfileComponent(data UserProfile) {
+	<div class="profile-result">
+		if data.Success {
+			<div class="alert alert-success">
+				<h3>Profile Updated Successfully!</h3>
+				<p><strong>Name:</strong> { data.Name }</p>
+				<p><strong>Email:</strong> { data.Email }</p>
+				if len(data.Tags) > 0 {
+					<p><strong>Tags:</strong> { strings.Join(data.Tags, ", ") }</p>
+				}
+			</div>
+		} else {
+			<div class="alert alert-warning">
+				Please fill in all required fields.
+			</div>
+		}
+	</div>
+}

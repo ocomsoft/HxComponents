@@ -1,0 +1,379 @@
+# HTMX Generic Component Registry
+
+A type-safe, reusable Go library pattern for building dynamic HTMX components with minimal boilerplate.
+
+## Overview
+
+The HTMX Generic Component Registry eliminates repetitive handler code by providing a clean, type-safe abstraction for:
+
+- **Form parsing** into typed structs using generics
+- **HTMX request headers** (HX-Boosted, HX-Request, HX-Current-URL, etc.)
+- **HTMX response headers** (HX-Redirect, HX-Trigger, HX-Reswap, etc.)
+- **Dynamic component routing** via centralized registry
+- **Type-safe rendering** with templ templates
+
+## Features
+
+- ✅ **Type-safe** - Uses Go 1.23+ generics for compile-time verification
+- ✅ **Zero boilerplate** - Automatic form parsing and header handling
+- ✅ **Interface-based** - Optional HTMX headers via clean interfaces
+- ✅ **Framework agnostic** - Works with chi, gorilla/mux, net/http
+- ✅ **Composable** - Mix and match header interfaces as needed
+- ✅ **Battle-tested** - Minimal dependencies, uses reflection efficiently
+
+## Quick Start
+
+### Installation
+
+```bash
+go get github.com/ocomsoft/HxComponents
+```
+
+### Basic Example
+
+**1. Define your component data struct:**
+
+```go
+package mycomponent
+
+type SearchForm struct {
+    Query string `form:"q"`
+    Limit int    `form:"limit"`
+}
+```
+
+**2. Create a templ component:**
+
+```templ
+package mycomponent
+
+templ SearchComponent(data SearchForm) {
+    <div>
+        <p>Query: { data.Query }</p>
+        <p>Limit: { fmt.Sprint(data.Limit) }</p>
+    </div>
+}
+```
+
+**3. Register and serve:**
+
+```go
+package main
+
+import (
+    "github.com/go-chi/chi/v5"
+    "github.com/ocomsoft/HxComponents/components"
+    "myapp/mycomponent"
+)
+
+func main() {
+    registry := components.NewRegistry()
+    components.Register(registry, "search", mycomponent.SearchComponent)
+
+    router := chi.NewRouter()
+    registry.Mount(router)
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+**4. Use in HTML:**
+
+```html
+<form hx-post="/component/search" hx-target="#results">
+    <input type="text" name="q" />
+    <input type="number" name="limit" value="10" />
+    <button>Search</button>
+</form>
+<div id="results"></div>
+```
+
+## HTMX Request Headers
+
+Capture HTMX request headers by implementing optional interfaces:
+
+```go
+type SearchForm struct {
+    Query      string `form:"q"`
+    IsBoosted  bool   `json:"-"`
+    CurrentURL string `json:"-"`
+}
+
+func (s *SearchForm) SetHxBoosted(v bool)      { s.IsBoosted = v }
+func (s *SearchForm) SetHxCurrentURL(v string) { s.CurrentURL = v }
+```
+
+**Available Request Interfaces:**
+
+| Interface | Header | Type |
+|-----------|--------|------|
+| `HxBoosted` | HX-Boosted | bool |
+| `HxRequest` | HX-Request | bool |
+| `HxCurrentURL` | HX-Current-URL | string |
+| `HxPrompt` | HX-Prompt | string |
+| `HxTarget` | HX-Target | string |
+| `HxTrigger` | HX-Trigger | string |
+| `HxTriggerName` | HX-Trigger-Name | string |
+
+## HTMX Response Headers
+
+Set HTMX response headers by implementing getter interfaces:
+
+```go
+type LoginForm struct {
+    Username   string `form:"username"`
+    Password   string `form:"password"`
+    RedirectTo string `json:"-"`
+}
+
+func (f *LoginForm) GetHxRedirect() string {
+    return f.RedirectTo
+}
+```
+
+**Available Response Interfaces:**
+
+| Interface | Header | Type |
+|-----------|--------|------|
+| `HxLocationResponse` | HX-Location | string |
+| `HxPushUrlResponse` | HX-Push-Url | string |
+| `HxRedirectResponse` | HX-Redirect | string |
+| `HxRefreshResponse` | HX-Refresh | bool |
+| `HxReplaceUrlResponse` | HX-Replace-Url | string |
+| `HxReswapResponse` | HX-Reswap | string |
+| `HxRetargetResponse` | HX-Retarget | string |
+| `HxReselectResponse` | HX-Reselect | string |
+| `HxTriggerResponse` | HX-Trigger | string |
+| `HxTriggerAfterSettleResponse` | HX-Trigger-After-Settle | string |
+| `HxTriggerAfterSwapResponse` | HX-Trigger-After-Swap | string |
+
+## Advanced Examples
+
+### Login Component with Redirect
+
+```go
+type LoginForm struct {
+    Username   string `form:"username"`
+    Password   string `form:"password"`
+    RedirectTo string `json:"-"`
+    Error      string `json:"-"`
+}
+
+func (f *LoginForm) GetHxRedirect() string {
+    return f.RedirectTo
+}
+
+func (f *LoginForm) ProcessLogin() error {
+    if f.Username == "demo" && f.Password == "password" {
+        f.RedirectTo = "/dashboard"
+        return nil
+    }
+    f.Error = "Invalid credentials"
+    return nil
+}
+```
+
+**Register with processing:**
+
+```go
+components.Register(registry, "login", func(data LoginForm) templ.Component {
+    data.ProcessLogin()
+    return LoginComponent(data)
+})
+```
+
+### Profile Update with Array Support
+
+```go
+type UserProfile struct {
+    Name  string   `form:"name"`
+    Email string   `form:"email"`
+    Tags  []string `form:"tags"`
+}
+```
+
+**HTML:**
+
+```html
+<form hx-post="/component/profile" hx-target="#result">
+    <input name="name" value="John" />
+    <input name="email" value="john@example.com" />
+    <input name="tags" value="developer" />
+    <input name="tags" value="golang" />
+    <button>Update</button>
+</form>
+```
+
+## Running the Example
+
+The `examples/` directory contains a complete demo application:
+
+```bash
+cd examples
+go run main.go
+```
+
+Then open http://localhost:8080 in your browser.
+
+The demo includes:
+- **Search Component** - Demonstrates request header capture
+- **Login Component** - Demonstrates response headers (redirects)
+- **Profile Component** - Demonstrates complex form data with arrays
+
+## Architecture
+
+### Registry Flow
+
+```
+1. HTTP POST /component/{name}
+2. Registry finds component entry
+3. Parse form data into typed struct
+4. Apply HTMX request headers (if interfaces implemented)
+5. Execute component logic (optional)
+6. Apply HTMX response headers (if interfaces implemented)
+7. Render templ component
+8. Return HTML response
+```
+
+### Type Safety
+
+The registry uses Go generics to maintain type safety:
+
+```go
+func Register[T any](r *Registry, name string, render func(T) templ.Component)
+```
+
+This ensures:
+- ✅ Compile-time type checking
+- ✅ No runtime type assertion errors
+- ✅ IDE autocomplete and refactoring support
+
+## API Reference
+
+### Registry Methods
+
+#### `NewRegistry() *Registry`
+Creates a new component registry.
+
+#### `Register[T any](r *Registry, name string, render func(T) templ.Component)`
+Registers a component with type-safe rendering function.
+
+**Parameters:**
+- `name` - Component name used in URL path
+- `render` - Function that takes typed data and returns templ.Component
+
+#### `Mount(router *chi.Mux)`
+Mounts the registry handler to chi router at `/component/{component_name}`.
+
+#### `Handler(w http.ResponseWriter, req *http.Request)`
+HTTP handler for component rendering. Can be used with any router.
+
+## Best Practices
+
+### 1. Use Descriptive Component Names
+
+```go
+// Good
+components.Register(registry, "user-search", SearchComponent)
+components.Register(registry, "profile-edit", ProfileComponent)
+
+// Avoid
+components.Register(registry, "comp1", SearchComponent)
+```
+
+### 2. Keep Component Logic Separate
+
+```go
+// Good - logic in method
+func (f *LoginForm) ProcessLogin() error { ... }
+
+components.Register(registry, "login", func(data LoginForm) templ.Component {
+    data.ProcessLogin()
+    return LoginComponent(data)
+})
+
+// Avoid - logic in template
+```
+
+### 3. Use JSON Tags to Hide Internal Fields
+
+```go
+type MyForm struct {
+    UserInput  string `form:"input"`
+    RedirectTo string `json:"-"` // Won't be serialized
+    IsBoosted  bool   `json:"-"` // Internal state
+}
+```
+
+### 4. Implement Only Needed Interfaces
+
+```go
+// Good - only implement what you need
+type SimpleForm struct {
+    Query string `form:"q"`
+}
+
+// Avoid - implementing unused interfaces
+```
+
+## Troubleshooting
+
+### Form Fields Not Parsing
+
+**Problem:** Struct fields remain empty after form submission.
+
+**Solution:** Ensure form tags match HTML input names exactly:
+
+```go
+type Form struct {
+    Email string `form:"email"` // Must match <input name="email">
+}
+```
+
+### Headers Not Applied
+
+**Problem:** HTMX headers not being captured or set.
+
+**Solution:** Verify interface implementation:
+
+```go
+// Implement pointer receiver
+func (f *MyForm) SetHxBoosted(v bool) {
+    f.IsBoosted = v
+}
+```
+
+### Component Not Found
+
+**Problem:** 404 error when posting to component.
+
+**Solution:** Check component name matches registration:
+
+```go
+components.Register(registry, "my-component", ...)
+// POST to: /component/my-component
+```
+
+## Dependencies
+
+- [templ](https://github.com/a-h/templ) - Type-safe Go templating
+- [chi](https://github.com/go-chi/chi) - Lightweight router (optional)
+- [form](https://github.com/go-playground/form) - Form decoding
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License - See LICENSE file for details.
+
+## Learn More
+
+- [HTMX Documentation](https://htmx.org/)
+- [templ Documentation](https://templ.guide/)
+- [Go Generics Tutorial](https://go.dev/doc/tutorial/generics)
+
+---
+
+**Built with ❤️ for the Go + HTMX community**

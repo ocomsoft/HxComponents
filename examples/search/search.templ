@@ -1,0 +1,26 @@
+package search
+
+import "fmt"
+
+templ SearchComponent(data SearchForm) {
+	<div class="search-results">
+		<h2>Search Results</h2>
+		<p><strong>Query:</strong> { data.Query }</p>
+		if data.IsBoosted {
+			<p class="info alert alert-info">This was a boosted request!</p>
+		}
+		if data.IsRequest {
+			<p class="info alert alert-info">This is an HTMX request</p>
+			if data.TriggerName != "" {
+				<p class="info">Triggered from: { data.TriggerName }</p>
+			}
+		}
+		if data.CurrentURL != "" {
+			<p><strong>Current URL:</strong> { data.CurrentURL }</p>
+		}
+		<p class="result-count"><strong>Showing up to { fmt.Sprint(data.Limit) } results</strong></p>
+		<div class="results-list">
+			<p>Search results for "{ data.Query }" would appear here...</p>
+		</div>
+	</div>
+}
