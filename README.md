@@ -36,7 +36,7 @@ go get github.com/ocomsoft/HxComponents
 ```go
 package mycomponent
 
-type SearchForm struct {
+type SearchComponent struct {
     Query string `form:"q"`
     Limit int    `form:"limit"`
 }
@@ -47,7 +47,7 @@ type SearchForm struct {
 ```templ
 package mycomponent
 
-templ SearchComponent(data SearchForm) {
+templ Search(data SearchComponent) {
     <div>
         <p>Query: { data.Query }</p>
         <p>Limit: { fmt.Sprint(data.Limit) }</p>
@@ -105,22 +105,22 @@ func main() {
 Capture HTMX request headers and HTTP method by implementing optional interfaces:
 
 ```go
-type SearchForm struct {
+type SearchComponent struct {
     Query      string `form:"q"`
     IsBoosted  bool   `json:"-"`
     CurrentURL string `json:"-"`
     Method     string `json:"-"` // "GET" or "POST"
 }
 
-func (s *SearchForm) SetHxBoosted(v bool)      { s.IsBoosted = v }
-func (s *SearchForm) SetHxCurrentURL(v string) { s.CurrentURL = v }
-func (s *SearchForm) SetHttpMethod(v string)   { s.Method = v }
+func (s *SearchComponent) SetHxBoosted(v bool)      { s.IsBoosted = v }
+func (s *SearchComponent) SetHxCurrentURL(v string) { s.CurrentURL = v }
+func (s *SearchComponent) SetHttpMethod(v string)   { s.Method = v }
 ```
 
 The `HttpMethod` interface is useful for varying component behavior based on GET vs POST:
 
 ```go
-func (s *SearchForm) Process() error {
+func (s *SearchComponent) Process() error {
     if s.Method == "GET" {
         // Load default search results
         s.Query = s.Query // Keep query from URL params
@@ -150,13 +150,13 @@ func (s *SearchForm) Process() error {
 Set HTMX response headers by implementing getter interfaces:
 
 ```go
-type LoginForm struct {
+type LoginComponent struct {
     Username   string `form:"username"`
     Password   string `form:"password"`
     RedirectTo string `json:"-"`
 }
 
-func (f *LoginForm) GetHxRedirect() string {
+func (f *LoginComponent) GetHxRedirect() string {
     return f.RedirectTo
 }
 ```
@@ -243,7 +243,7 @@ type Processor interface {
 The registry automatically calls `Process()` if your component implements this interface:
 
 ```go
-type LoginForm struct {
+type LoginComponent struct {
     Username   string `form:"username"`
     Password   string `form:"password"`
     RedirectTo string `json:"-"`
@@ -251,7 +251,7 @@ type LoginForm struct {
 }
 
 // Implement Processor interface
-func (f *LoginForm) Process() error {
+func (f *LoginComponent) Process() error {
     if f.Username == "demo" && f.Password == "password" {
         f.RedirectTo = "/dashboard"  // This will trigger HX-Redirect
         return nil
@@ -261,7 +261,7 @@ func (f *LoginForm) Process() error {
 }
 
 // Implement response header interface
-func (f *LoginForm) GetHxRedirect() string {
+func (f *LoginComponent) GetHxRedirect() string {
     return f.RedirectTo
 }
 ```
@@ -292,7 +292,7 @@ func (f *LoginForm) GetHxRedirect() string {
 This example is now simplified with the `Processor` interface:
 
 ```go
-type LoginForm struct {
+type LoginComponent struct {
     Username   string `form:"username"`
     Password   string `form:"password"`
     RedirectTo string `json:"-"`
@@ -300,7 +300,7 @@ type LoginForm struct {
 }
 
 // Processor interface - called automatically by registry
-func (f *LoginForm) Process() error {
+func (f *LoginComponent) Process() error {
     if f.Username == "demo" && f.Password == "password" {
         f.RedirectTo = "/dashboard"
         return nil
@@ -310,7 +310,7 @@ func (f *LoginForm) Process() error {
 }
 
 // Response header interface
-func (f *LoginForm) GetHxRedirect() string {
+func (f *LoginComponent) GetHxRedirect() string {
     return f.RedirectTo
 }
 ```
@@ -318,7 +318,7 @@ func (f *LoginForm) GetHxRedirect() string {
 **Register (simplified):**
 
 ```go
-components.Register(registry, "login", LoginComponent)
+components.Register(registry, "login", Login)
 ```
 
 The registry automatically calls `Process()` before rendering!
@@ -326,7 +326,7 @@ The registry automatically calls `Process()` before rendering!
 ### Profile Update with Array Support
 
 ```go
-type UserProfile struct {
+type ProfileComponent struct {
     Name  string   `form:"name"`
     Email string   `form:"email"`
     Tags  []string `form:"tags"`
@@ -426,9 +426,9 @@ components.Register(registry, "comp1", SearchComponent)
 
 ```go
 // Good - logic in method
-func (f *LoginForm) ProcessLogin() error { ... }
+func (f *LoginComponent) ProcessLogin() error { ... }
 
-components.Register(registry, "login", func(data LoginForm) templ.Component {
+components.Register(registry, "login", func(data LoginComponent) templ.Component {
     data.ProcessLogin()
     return LoginComponent(data)
 })

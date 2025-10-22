@@ -2,7 +2,7 @@ package profile
 
 import "strings"
 
-templ ProfileComponent(data UserProfile) {
+templ Profile(data ProfileComponent) {
 	<div class="profile-result">
 		if data.Success {
 			<div class="alert alert-success">
