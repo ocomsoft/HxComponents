@@ -102,22 +102,39 @@ func main() {
 
 ## HTMX Request Headers
 
-Capture HTMX request headers by implementing optional interfaces:
+Capture HTMX request headers and HTTP method by implementing optional interfaces:
 
 ```go
 type SearchForm struct {
     Query      string `form:"q"`
     IsBoosted  bool   `json:"-"`
     CurrentURL string `json:"-"`
+    Method     string `json:"-"` // "GET" or "POST"
 }
 
 func (s *SearchForm) SetHxBoosted(v bool)      { s.IsBoosted = v }
 func (s *SearchForm) SetHxCurrentURL(v string) { s.CurrentURL = v }
+func (s *SearchForm) SetHttpMethod(v string)   { s.Method = v }
+```
+
+The `HttpMethod` interface is useful for varying component behavior based on GET vs POST:
+
+```go
+func (s *SearchForm) Process() error {
+    if s.Method == "GET" {
+        // Load default search results
+        s.Query = s.Query // Keep query from URL params
+    } else {
+        // POST - user submitted form
+        // Validate input, log search, etc.
+    }
+    return nil
+}
 ```
 
 **Available Request Interfaces:**
 
-| Interface | Header | Type |
+| Interface | Header/Source | Type |
 |-----------|--------|------|
 | `HxBoosted` | HX-Boosted | bool |
 | `HxRequest` | HX-Request | bool |
@@ -126,6 +143,7 @@ func (s *SearchForm) SetHxCurrentURL(v string) { s.CurrentURL = v }
 | `HxTarget` | HX-Target | string |
 | `HxTrigger` | HX-Trigger | string |
 | `HxTriggerName` | HX-Trigger-Name | string |
+| `HttpMethod` | HTTP Method (GET/POST) | string |
 
 ## HTMX Response Headers
 
@@ -271,6 +289,8 @@ func (f *LoginForm) GetHxRedirect() string {
 
 ### Login Component with Redirect
 
+This example is now simplified with the `Processor` interface:
+
 ```go
 type LoginForm struct {
     Username   string `form:"username"`
@@ -279,11 +299,8 @@ type LoginForm struct {
     Error      string `json:"-"`
 }
 
-func (f *LoginForm) GetHxRedirect() string {
-    return f.RedirectTo
-}
-
-func (f *LoginForm) ProcessLogin() error {
+// Processor interface - called automatically by registry
+func (f *LoginForm) Process() error {
     if f.Username == "demo" && f.Password == "password" {
         f.RedirectTo = "/dashboard"
         return nil
@@ -291,16 +308,20 @@ func (f *LoginForm) ProcessLogin() error {
     f.Error = "Invalid credentials"
     return nil
 }
+
+// Response header interface
+func (f *LoginForm) GetHxRedirect() string {
+    return f.RedirectTo
+}
 ```
 
-**Register with processing:**
+**Register (simplified):**
 
 ```go
-components.Register(registry, "login", func(data LoginForm) templ.Component {
-    data.ProcessLogin()
-    return LoginComponent(data)
-})
+components.Register(registry, "login", LoginComponent)
 ```
+
+The registry automatically calls `Process()` before rendering!
 
 ### Profile Update with Array Support
 

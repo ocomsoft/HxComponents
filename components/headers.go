@@ -28,6 +28,9 @@ func applyHxHeaders(instance interface{}, req *http.Request) {
 	if v, ok := instance.(HxTriggerName); ok {
 		v.SetHxTriggerName(req.Header.Get("HX-Trigger-Name"))
 	}
+	if v, ok := instance.(HttpMethod); ok {
+		v.SetHttpMethod(req.Method)
+	}
 }
 
 // applyHxResponseHeaders applies HTMX response headers from the instance if it implements

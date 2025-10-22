@@ -41,3 +41,9 @@ type HxTrigger interface {
 type HxTriggerName interface {
 	SetHxTriggerName(string)
 }
+
+// HttpMethod is implemented by structs that want to receive the HTTP method (GET or POST).
+// This allows components to vary behavior based on whether they were loaded via GET or submitted via POST.
+type HttpMethod interface {
+	SetHttpMethod(string)
+}
