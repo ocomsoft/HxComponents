@@ -26,19 +26,19 @@ func (t *TestEventComponent) BeforeEvent(ctx context.Context, eventName string) 
 	return nil
 }
 
-func (t *TestEventComponent) OnIncrement() error {
+func (t *TestEventComponent) OnIncrement(ctx context.Context) error {
 	t.EventsHistory = append(t.EventsHistory, "OnIncrement")
 	t.Count++
 	return nil
 }
 
-func (t *TestEventComponent) OnDecrement() error {
+func (t *TestEventComponent) OnDecrement(ctx context.Context) error {
 	t.EventsHistory = append(t.EventsHistory, "OnDecrement")
 	t.Count--
 	return nil
 }
 
-func (t *TestEventComponent) OnError() error {
+func (t *TestEventComponent) OnError(ctx context.Context) error {
 	t.EventsHistory = append(t.EventsHistory, "OnError")
 	return fmt.Errorf("intentional error")
 }
@@ -68,7 +68,7 @@ func (t *TestBeforeEventErrorComponent) BeforeEvent(ctx context.Context, eventNa
 	return fmt.Errorf("before event error")
 }
 
-func (t *TestBeforeEventErrorComponent) OnDoSomething() error {
+func (t *TestBeforeEventErrorComponent) OnDoSomething(ctx context.Context) error {
 	t.Called = true
 	return nil
 }
@@ -84,7 +84,7 @@ type TestAfterEventErrorComponent struct {
 	ProcessCalled      bool `json:"-"`
 }
 
-func (t *TestAfterEventErrorComponent) OnDoSomething() error {
+func (t *TestAfterEventErrorComponent) OnDoSomething(ctx context.Context) error {
 	t.EventHandlerCalled = true
 	return nil
 }
@@ -230,7 +230,8 @@ func TestMissingEventHandler(t *testing.T) {
 	// Error message should indicate missing handler
 	body := w.Body.String()
 	assert.Contains(t, body, "Event Error")
-	assert.Contains(t, body, "OnNonExistent")
+	assert.Contains(t, body, "nonExistent")
+	assert.Contains(t, body, "not found")
 }
 
 func TestEventWithoutHxcEventParam(t *testing.T) {
@@ -345,7 +346,7 @@ type SimpleComponent struct {
 	Count int `form:"count"`
 }
 
-func (s *SimpleComponent) OnIncrement() error {
+func (s *SimpleComponent) OnIncrement(ctx context.Context) error {
 	s.Count++
 	return nil
 }

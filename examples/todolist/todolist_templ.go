@@ -38,7 +38,7 @@ func TodoList(data TodoListComponent) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.GetActiveCount()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 12, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 12, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -51,7 +51,7 @@ func TodoList(data TodoListComponent) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.GetCompletedCount()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 15, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 15, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -64,7 +64,7 @@ func TodoList(data TodoListComponent) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(len(data.Items)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 18, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 18, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -82,7 +82,7 @@ func TodoList(data TodoListComponent) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(data.LastEvent)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 25, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 25, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -95,7 +95,7 @@ func TodoList(data TodoListComponent) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.EventCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 25, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 25, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -108,7 +108,7 @@ func TodoList(data TodoListComponent) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(data.GetTimestamp())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 25, Col: 117}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 25, Col: 117}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +126,7 @@ func TodoList(data TodoListComponent) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.GetItemsJSON())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 30, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 30, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -156,7 +156,7 @@ func TodoList(data TodoListComponent) templ.Component {
 						return ""
 					}()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 69, Col: 10}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 69, Col: 10}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -179,7 +179,7 @@ func TodoList(data TodoListComponent) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"itemId": %d, "hxc-event": "toggleItem"}`, item.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 76, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 76, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -198,7 +198,7 @@ func TodoList(data TodoListComponent) templ.Component {
 						return "color: #212529;"
 					}()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 89, Col: 11}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 89, Col: 11}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -211,7 +211,7 @@ func TodoList(data TodoListComponent) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(item.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 90, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 90, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -224,7 +224,7 @@ func TodoList(data TodoListComponent) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(`{"itemId": %d, "hxc-event": "deleteItem"}`, item.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 97, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 97, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -248,7 +248,7 @@ func TodoList(data TodoListComponent) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Clear %d completed items?", data.GetCompletedCount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 119, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 119, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -261,7 +261,7 @@ func TodoList(data TodoListComponent) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(data.GetCompletedCount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `todolist/todolist.templ`, Line: 122, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/todolist/todolist.templ`, Line: 122, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {

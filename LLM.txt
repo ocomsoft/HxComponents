@@ -26,13 +26,18 @@ The library provides a centralized registry that:
 
 ```
 /components/
-  registry.go           - Core registry implementation
+  registry.go           - Core registry implementation with panic recovery
   processor.go          - Processor interface for business logic
+  initializer.go        - Initializer interface for component setup (NEW)
+  validator.go          - Validator interface for form validation (NEW)
+  event_handler.go      - Event handler interfaces (BeforeEvent, AfterEvent)
   request_headers.go    - HTMX request header interfaces
   response_headers.go   - HTMX response header interfaces
   headers.go            - Header application logic
+  errors.go             - Structured error types (NEW)
   error.templ           - Default error template
   registry_test.go      - Comprehensive tests
+  registry_event_test.go - Event handler tests
 
 /examples/
   main.go               - Example application
@@ -40,7 +45,11 @@ The library provides a centralized registry that:
   /search/              - Search component example
   /login/               - Login component example
   /profile/             - Profile component example
+  /counter/             - Counter component with events
+  /todolist/            - TodoList component with full lifecycle
+  /card/                - Card component with Constructor pattern (NEW)
   /pages/               - Page templates
+  /testutil/            - Test utilities (Playwright helpers)
 ```
 
 ## Core Components
@@ -50,42 +59,153 @@ The library provides a centralized registry that:
 **Key Types:**
 ```go
 type Registry struct {
+    mu           sync.RWMutex
     components   map[string]componentEntry
     errorHandler ErrorHandler
+    debugMode    bool
 }
 
 type componentEntry struct {
     structType reflect.Type
-    render     func(interface{}) templ.Component
 }
 
 type ErrorHandler func(w http.ResponseWriter, req *http.Request, title string, message string, code int)
+
+type ComponentInfo struct {
+    Name       string
+    StructType string
+}
 ```
 
 **Key Methods:**
 - `NewRegistry()` - Creates new registry with default error handler
-- `Register[T any](registry, name, renderFunc)` - Registers a component
-- `Handler(w, req)` - Extracts component name from URL and renders (wildcard routing)
-- `HandlerFor(componentName)` - Returns http.HandlerFunc for specific component
+- `Register[T templ.Component](registry, name)` - Registers a component (component must implement templ.Component)
+- `Handler(w, req)` - Extracts component name from URL and renders (wildcard routing) with validation
+- `HandlerFor(componentName)` - Returns http.HandlerFunc for specific component with panic recovery
 - `SetErrorHandler(handler)` - Customizes error rendering
+- `EnableDebugMode()` / `DisableDebugMode()` - Toggle debug headers (NEW)
+- `ListComponents()` - Get all registered component names (NEW)
+- `IsRegistered(name)` - Check if component exists (NEW)
+- `GetComponentInfo(name)` - Get component metadata (NEW)
 
-### 2. Processor Interface (`components/processor.go`)
+### 2. Initializer Interface (`components/initializer.go`) - NEW
 
 ```go
-type Processor interface {
-    Process() error
+type Initializer interface {
+    Init(ctx context.Context) error
 }
 ```
 
-Components implement this to run business logic after form decoding but before rendering.
+Components implement this to perform initialization logic. Called after form decoding but before validation/events/processing.
 
 **Use cases:**
-- Form validation
-- Authentication/authorization
-- Database operations
-- Setting conditional response headers
+- Set default values
+- Load data from database
+- Initialize computed fields
+- Constructor pattern for templ templates
 
-### 3. HTMX Request Headers (`components/request_headers.go`)
+**Example Constructor Pattern:**
+```go
+func NewCard(ctx context.Context, title string, count int) *CardComponent {
+    c := &CardComponent{Title: title, Count: count}
+    _ = c.Init(ctx)  // Initialize computed fields
+    return c
+}
+
+func (c *CardComponent) Init(ctx context.Context) error {
+    if c.Title == "" {
+        c.Title = "Untitled"
+    }
+    c.Description = fmt.Sprintf("Card with %d items", c.Count)
+    return nil
+}
+```
+
+Usage in templ: `@NewCard(ctx, "My Card", 42)`
+
+### 3. Validator Interface (`components/validator.go`) - NEW
+
+```go
+type Validator interface {
+    Validate(ctx context.Context) []ValidationError
+}
+
+type ValidationError struct {
+    Field   string
+    Message string
+}
+```
+
+Components implement this for field-level validation. Called after Init but before events.
+
+**Use cases:**
+- Form field validation
+- Business rule validation
+- Return validation errors for rendering
+
+### 4. Event Handler Interfaces (`components/event_handler.go`)
+
+```go
+type BeforeEventHandler interface {
+    BeforeEvent(ctx context.Context, eventName string) error
+}
+
+type AfterEventHandler interface {
+    AfterEvent(ctx context.Context, eventName string) error
+}
+```
+
+Components can implement hooks that run before/after event handlers.
+
+**Event Handler Methods:**
+- Must have signature: `On{EventName}(ctx context.Context) error`
+- Example: `OnIncrement(ctx)`, `OnAddItem(ctx)`, `OnDelete(ctx)`
+- Triggered by `hxc-event` form parameter
+- Context provides request-scoped values and cancellation
+
+### 5. Processor Interface (`components/processor.go`)
+
+```go
+type Processor interface {
+    Process(ctx context.Context) error
+}
+```
+
+Components implement this to run business logic after events but before rendering.
+
+**Use cases:**
+- Final data transformations
+- Database save operations
+- Setting response headers based on processing results
+
+### 6. Structured Error Types (`components/errors.go`) - NEW
+
+```go
+type ComponentError struct {
+    ComponentName string
+    Operation     string // "parse", "decode", "process", "render", "event"
+    Err           error
+    StatusCode    int
+}
+
+type ErrComponentNotFound struct {
+    ComponentName string
+}
+
+type ErrEventNotFound struct {
+    ComponentName string
+    EventName     string
+}
+
+type ErrInvalidComponentName struct {
+    ComponentName string
+    Reason        string
+}
+```
+
+Structured errors for better error handling and debugging.
+
+### 7. HTMX Request Headers (`components/request_headers.go`)
 
 Optional interfaces components can implement to capture HTMX request headers:
 
@@ -100,7 +220,7 @@ type HxTriggerName interface { SetHxTriggerName(string) }
 type HttpMethod interface { SetHttpMethod(string) }
 ```
 
-### 4. HTMX Response Headers (`components/response_headers.go`)
+### 8. HTMX Response Headers (`components/response_headers.go`)
 
 Optional interfaces components can implement to set HTMX response headers:
 
@@ -118,24 +238,38 @@ type HxTriggerAfterSettleResponse interface { GetHxTriggerAfterSettle() string }
 type HxTriggerAfterSwapResponse interface { GetHxTriggerAfterSwap() string }
 ```
 
-## Request Flow
+## Request Flow (Updated)
 
 ```
 1. HTTP Request (GET or POST) arrives
-2. Registry.HandlerFor(componentName) handler is invoked
+2. Registry.HandlerFor(componentName) handler is invoked with panic recovery
 3. Check HTTP method (only GET and POST allowed)
-4. Look up component in registry
-5. Parse form data (POST: req.PostForm, GET: req.Form)
-6. Create instance of component struct
-7. Decode form data into struct using go-playground/form
-8. Apply HTMX request headers (if interfaces implemented)
-9. Call Process() method (if Processor interface implemented)
-10. Apply HTMX response headers (if interfaces implemented)
-11. Render component using templ
-12. Return HTML response
+4. Validate component name (alphanumeric, dash, underscore only)
+5. Look up component in registry
+6. Parse form data (POST: req.PostForm, GET: req.Form)
+7. Create instance of component struct
+8. Decode form data into struct using go-playground/form (custom decoder supported)
+9. Apply HTMX request headers (if interfaces implemented)
+10. Call Init(ctx) method (if Initializer interface implemented) - NEW
+11. Call Validate(ctx) method (if Validator interface implemented) - NEW
+12. Handle events if hxc-event parameter present:
+    a. Call BeforeEvent(ctx, eventName) if implemented
+    b. Call On{EventName}(ctx) event handler - REQUIRES CONTEXT NOW
+    c. Call AfterEvent(ctx, eventName) if implemented
+13. Call Process(ctx) method (if Processor interface implemented)
+14. Apply HTMX response headers (if interfaces implemented)
+15. Add debug headers if debug mode enabled
+16. Render component using templ
+17. Return HTML response
+
+Note: Context (ctx) is now passed to all lifecycle methods for:
+- Database queries
+- Request cancellation
+- Request-scoped values
+- Timeout handling
 ```
 
-## Example Component
+## Example Component (Updated)
 
 ```go
 // Component struct with form tags
@@ -144,10 +278,26 @@ type LoginComponent struct {
     Password   string `form:"password"`
     RedirectTo string `json:"-"`
     Error      string `json:"-"`
+    Errors     []components.ValidationError `json:"-"`
 }
 
-// Implement Processor interface
-func (c *LoginComponent) Process() error {
+// Implement Validator interface (NEW)
+func (c *LoginComponent) Validate(ctx context.Context) []components.ValidationError {
+    var errs []components.ValidationError
+    if c.Username == "" {
+        errs = append(errs, components.ValidationError{
+            Field: "username", Message: "Username is required"})
+    }
+    if len(c.Password) < 8 {
+        errs = append(errs, components.ValidationError{
+            Field: "password", Message: "Password must be at least 8 characters"})
+    }
+    c.Errors = errs
+    return errs
+}
+
+// Implement Processor interface (context parameter now required)
+func (c *LoginComponent) Process(ctx context.Context) error {
     if c.Username == "demo" && c.Password == "password" {
         c.RedirectTo = "/dashboard"
         return nil
@@ -161,12 +311,24 @@ func (c *LoginComponent) GetHxRedirect() string {
     return c.RedirectTo
 }
 
+// Implement templ.Component
+func (c *LoginComponent) Render(ctx context.Context, w io.Writer) error {
+    return Login(*c).Render(ctx, w)
+}
+
 // Templ template (in login.templ)
 templ Login(data LoginComponent) {
     if data.Error != "" {
         <div class="error">{data.Error}</div>
     }
-    <form hx-post="/login">
+    if len(data.Errors) > 0 {
+        <ul class="errors">
+            for _, err := range data.Errors {
+                <li>{err.Field}: {err.Message}</li>
+            }
+        </ul>
+    }
+    <form hx-post="/component/login" hx-target="#result">
         <input type="text" name="username" />
         <input type="password" name="password" />
         <button>Login</button>
@@ -244,8 +406,8 @@ type LoginComponent struct {
     RedirectTo string
 }
 
-func (c *LoginComponent) Process() error {
-    if authenticate(c.Username) {
+func (c *LoginComponent) Process(ctx context.Context) error {
+    if authenticate(ctx, c.Username) {
         c.RedirectTo = "/dashboard"
     }
     return nil
@@ -256,17 +418,45 @@ func (c *LoginComponent) GetHxRedirect() string {
 }
 ```
 
-### Form Validation
+### Form Validation with Validator Interface
 ```go
 type FormComponent struct {
-    Email string
-    Error string
+    Email  string `form:"email"`
+    Errors []components.ValidationError `json:"-"`
 }
 
-func (c *FormComponent) Process() error {
+func (c *FormComponent) Validate(ctx context.Context) []components.ValidationError {
+    var errs []components.ValidationError
     if !isValidEmail(c.Email) {
-        c.Error = "Invalid email"
+        errs = append(errs, components.ValidationError{
+            Field: "email", Message: "Invalid email address"})
     }
+    c.Errors = errs
+    return errs
+}
+```
+
+### Constructor Pattern with Init
+```go
+type DashboardComponent struct {
+    UserID      int    `form:"user_id"`
+    Username    string `json:"-"` // Loaded in Init
+    Stats       Stats  `json:"-"` // Computed in Init
+}
+
+func NewDashboard(ctx context.Context, userID int) *DashboardComponent {
+    d := &DashboardComponent{UserID: userID}
+    _ = d.Init(ctx)
+    return d
+}
+
+func (d *DashboardComponent) Init(ctx context.Context) error {
+    user, err := db.GetUser(ctx, d.UserID)
+    if err != nil {
+        return err
+    }
+    d.Username = user.Name
+    d.Stats = computeStats(ctx, d.UserID)
     return nil
 }
 ```
@@ -282,11 +472,41 @@ func (c *SearchComponent) SetHttpMethod(m string) {
     c.Method = m
 }
 
-func (c *SearchComponent) Process() error {
+func (c *SearchComponent) Process(ctx context.Context) error {
     if c.Method == "GET" {
         // Load default results
     } else {
-        // Process search query
+        // Process search query with context
+        results, err := search(ctx, c.Query)
+        if err != nil {
+            return err
+        }
+        c.Results = results
+    }
+    return nil
+}
+```
+
+### Event Handlers with Context
+```go
+type TodoComponent struct {
+    Items []TodoItem `form:"items"`
+}
+
+func (t *TodoComponent) OnAddItem(ctx context.Context) error {
+    // Use context for database operations
+    item, err := db.CreateTodoItem(ctx, t.NewItemText)
+    if err != nil {
+        return err
+    }
+    t.Items = append(t.Items, item)
+    return nil
+}
+
+func (t *TodoComponent) BeforeEvent(ctx context.Context, eventName string) error {
+    // Check authentication before any event
+    if !isAuthenticated(ctx) {
+        return errors.New("unauthorized")
     }
     return nil
 }
@@ -296,13 +516,23 @@ func (c *SearchComponent) Process() error {
 
 1. **Default Handler**: Uses `ErrorComponent` templ template
 2. **Custom Handler**: Set via `SetErrorHandler()`
-3. **Error Types**:
+3. **Structured Error Types**:
+   - `ComponentError` - Wraps errors with context (component name, operation, status code)
+   - `ErrComponentNotFound` - Component not registered
+   - `ErrEventNotFound` - Event handler method not found
+   - `ErrInvalidComponentName` - Invalid component name (security)
+4. **HTTP Status Codes**:
    - Method Not Allowed (405)
    - Component Not Found (404)
+   - Invalid Component Name (400)
    - Form Parse Error (400)
    - Form Decode Error (400)
+   - Validation Error (400)
+   - Init Error (500)
+   - Event Error (500)
    - Process Error (500)
    - Render Error (500)
+5. **Panic Recovery**: HandlerFor includes panic recovery with stack trace logging
 
 ## Logging
 
@@ -314,12 +544,17 @@ Uses `log/slog` with structured logging:
 ## Best Practices
 
 1. **Use json:"-" tag** for internal fields that shouldn't be serialized
-2. **Implement Process()** for business logic instead of render function
-3. **Return nil from Process()** for validation errors (store in struct field)
-4. **Return error from Process()** only for unexpected failures
-5. **Use HandlerFor()** for framework-agnostic code
-6. **Use Mount()** for rapid chi prototyping
-7. **Register GET and POST** for best HTMX compatibility
+2. **Use Init() for defaults** - Set default values and load data in Init, not in constructor
+3. **Use Validate() for validation** - Return ValidationErrors instead of checking in Process
+4. **Use context parameter** - All lifecycle methods now receive context for database access and cancellation
+5. **Implement Process(ctx)** for business logic after validation
+6. **Return nil from Process(ctx)** for validation errors (use Validator interface instead)
+7. **Return error from Process(ctx)** only for unexpected failures
+8. **Use Constructor pattern** - Create NewComponent(ctx, params) for easy template usage
+9. **Use HandlerFor()** for framework-agnostic code
+10. **Component name validation** - Only alphanumeric, dash, underscore (max 100 chars)
+11. **Register GET and POST** for best HTMX compatibility
+12. **Event handlers require context** - All On{Event} methods must accept context.Context parameter
 
 ## Limitations
 
@@ -330,8 +565,9 @@ Uses `log/slog` with structured logging:
 
 ## Future Enhancements (Not Implemented)
 
-- Middleware support
-- Component lifecycle hooks
-- Built-in validation helpers
+- Middleware support (use router middleware for cross-cutting concerns)
+- Built-in validation helpers (currently manual via Validator interface)
 - WebSocket support
 - Server-sent events
+- Nested struct support in form decoder
+- Custom form decoders per component (currently global decoder only)

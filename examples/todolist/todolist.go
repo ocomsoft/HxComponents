@@ -56,7 +56,7 @@ func (t *TodoListComponent) AfterEvent(ctx context.Context, eventName string) er
 }
 
 // OnAddItem handles the "addItem" event.
-func (t *TodoListComponent) OnAddItem() error {
+func (t *TodoListComponent) OnAddItem(ctx context.Context) error {
 	if t.NewItemText == "" {
 		return fmt.Errorf("item text cannot be empty")
 	}
@@ -85,7 +85,7 @@ func (t *TodoListComponent) OnAddItem() error {
 }
 
 // OnToggleItem handles the "toggleItem" event.
-func (t *TodoListComponent) OnToggleItem() error {
+func (t *TodoListComponent) OnToggleItem(ctx context.Context) error {
 	for i := range t.Items {
 		if t.Items[i].ID == t.ItemID {
 			t.Items[i].Completed = !t.Items[i].Completed
@@ -97,7 +97,7 @@ func (t *TodoListComponent) OnToggleItem() error {
 }
 
 // OnDeleteItem handles the "deleteItem" event.
-func (t *TodoListComponent) OnDeleteItem() error {
+func (t *TodoListComponent) OnDeleteItem(ctx context.Context) error {
 	for i, item := range t.Items {
 		if item.ID == t.ItemID {
 			// Remove item from slice
@@ -110,7 +110,7 @@ func (t *TodoListComponent) OnDeleteItem() error {
 }
 
 // OnClearCompleted handles the "clearCompleted" event.
-func (t *TodoListComponent) OnClearCompleted() error {
+func (t *TodoListComponent) OnClearCompleted(ctx context.Context) error {
 	// Filter out completed items
 	remaining := []TodoItem{}
 	removedCount := 0

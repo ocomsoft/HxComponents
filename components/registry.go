@@ -18,6 +18,8 @@ import (
 	"log/slog"
 	"net/http"
 	"reflect"
+	"runtime/debug"
+	"sort"
 	"strings"
 	"sync"
 
@@ -151,20 +153,38 @@ func Register[T templ.Component](r *Registry, name string) {
 	structType := reflect.TypeOf(zero)
 
 	// Validate that T is a pointer type
-	if structType == nil || structType.Kind() != reflect.Ptr {
-		panic(fmt.Sprintf("component type must be a pointer type, got %T", zero))
+	if structType == nil {
+		panic(fmt.Sprintf("component type cannot be nil (component name: %s)", name))
+	}
+
+	if structType.Kind() != reflect.Ptr {
+		typeName := structType.Name()
+		if typeName == "" {
+			typeName = structType.String()
+		}
+		panic(fmt.Sprintf(
+			"component type must be a pointer type, got %T\n"+
+				"Hint: Use Register[*%s](registry, %q) instead of Register[%s](...)",
+			zero, typeName, name, structType.String()))
 	}
 
 	// Validate that the pointer points to a struct
 	if structType.Elem().Kind() != reflect.Struct {
-		panic(fmt.Sprintf("component must point to a struct, got %T", zero))
+		panic(fmt.Sprintf(
+			"component must point to a struct, got pointer to %s (component name: %s)\n"+
+				"Hint: Components must be struct types that implement templ.Component",
+			structType.Elem().Kind(), name))
 	}
 
 	// Validate that the component implements templ.Component
 	// This is enforced at compile time by the generic constraint,
 	// but we verify it here for runtime safety
 	if _, ok := interface{}(zero).(templ.Component); !ok {
-		panic(fmt.Sprintf("component type %T does not implement templ.Component", zero))
+		structName := structType.Elem().Name()
+		panic(fmt.Sprintf(
+			"component type %T does not implement templ.Component (component name: %s)\n"+
+				"Hint: Add a Render(ctx context.Context, w io.Writer) error method to %s",
+			zero, name, structName))
 	}
 
 	// Thread-safe registration
@@ -275,6 +295,19 @@ func Register[T templ.Component](r *Registry, name string) {
 //	router.HandleFunc("/search", registry.HandlerFor("search"))
 func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		// Panic recovery
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error("panic in component handler",
+					"component", componentName,
+					"error", err,
+					"stack", string(debug.Stack()))
+				r.renderError(w, req, "Internal Server Error",
+					"Component encountered an unexpected error",
+					http.StatusInternalServerError)
+			}
+		}()
+
 		if req.Method != http.MethodPost && req.Method != http.MethodGet {
 			slog.Warn("method not allowed",
 				"method", req.Method,
@@ -341,6 +374,29 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 
 		// Apply request headers
 		applyHxHeaders(instance.Interface(), req)
+
+		// Initialize component if it implements Initializer interface
+		if initializer, ok := instance.Interface().(Initializer); ok {
+			if err := initializer.Init(req.Context()); err != nil {
+				slog.Error("component init error",
+					"component", componentName,
+					"error", err)
+				r.renderError(w, req, "Initialization Error", fmt.Sprintf("Component initialization failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Validate if component implements Validator interface
+		if validator, ok := instance.Interface().(Validator); ok {
+			if errs := validator.Validate(req.Context()); len(errs) > 0 {
+				slog.Debug("validation errors",
+					"component", componentName,
+					"errors", errs)
+				// Validation errors don't stop processing - they're stored in the component
+				// and can be rendered in the template. Components can choose to handle
+				// validation errors differently by checking in their Process() method.
+			}
+		}
 
 		// Handle event-driven processing if hxc-event parameter is present
 		hasEvent := false
@@ -433,16 +489,31 @@ func (r *Registry) handleEvent(ctx context.Context, instance interface{}, eventN
 	method := value.MethodByName(methodName)
 
 	if !method.IsValid() {
-		return fmt.Errorf("event handler method '%s' not found", methodName)
+		return &ErrEventNotFound{
+			ComponentName: componentName,
+			EventName:     eventName,
+		}
 	}
 
-	// Call the event handler method
+	// Validate event handler signature: On{Event}(ctx context.Context) error
+	methodType := method.Type()
+	if methodType.NumIn() != 1 {
+		return fmt.Errorf("event handler '%s' must have signature On%s(ctx context.Context) error", methodName, capitalize(eventName))
+	}
+
+	// Check that first parameter is context.Context
+	ctxType := reflect.TypeOf((*context.Context)(nil)).Elem()
+	if !methodType.In(0).Implements(ctxType) {
+		return fmt.Errorf("event handler '%s' first parameter must be context.Context", methodName)
+	}
+
+	// Call the event handler method with context
 	slog.Debug("calling event handler",
 		"component", componentName,
 		"event", eventName,
 		"method", methodName)
 
-	results := method.Call(nil)
+	results := method.Call([]reflect.Value{reflect.ValueOf(ctx)})
 
 	// Check if method returns an error
 	if len(results) > 0 {
@@ -522,6 +593,20 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Validate component name (alphanumeric, dash, underscore only)
+	if !isValidComponentName(componentName) {
+		err := &ErrInvalidComponentName{
+			ComponentName: componentName,
+			Reason:        "component names must contain only alphanumeric characters, dashes, and underscores, and be less than 100 characters",
+		}
+		slog.Warn("invalid component name",
+			"component", componentName,
+			"path", req.URL.Path,
+			"error", err)
+		r.renderError(w, req, "Bad Request", err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	// Use HandlerFor to handle the actual request
 	r.HandlerFor(componentName)(w, req)
 }
@@ -529,4 +614,64 @@ func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
 // renderError renders error responses using the configured error handler
 func (r *Registry) renderError(w http.ResponseWriter, req *http.Request, title string, message string, code int) {
 	r.errorHandler(w, req, title, message, code)
+}
+
+// ListComponents returns the names of all registered components in alphabetical order.
+func (r *Registry) ListComponents() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	names := make([]string, 0, len(r.components))
+	for name := range r.components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// IsRegistered checks if a component name is registered.
+func (r *Registry) IsRegistered(name string) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	_, exists := r.components[name]
+	return exists
+}
+
+// ComponentInfo contains metadata about a registered component.
+type ComponentInfo struct {
+	Name       string
+	StructType string
+}
+
+// GetComponentInfo returns metadata about a registered component.
+func (r *Registry) GetComponentInfo(name string) (ComponentInfo, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	meta, exists := r.components[name]
+	if !exists {
+		return ComponentInfo{}, &ErrComponentNotFound{ComponentName: name}
+	}
+
+	return ComponentInfo{
+		Name:       name,
+		StructType: meta.structType.String(),
+	}, nil
+}
+
+// isValidComponentName validates that a component name contains only
+// alphanumeric characters, dashes, and underscores, and is not too long.
+func isValidComponentName(name string) bool {
+	if name == "" || len(name) > 100 {
+		return false
+	}
+	for _, r := range name {
+		if !((r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }

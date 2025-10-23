@@ -1,0 +1,19 @@
+package card
+
+templ Card(data CardComponent) {
+	<div class="card" style="border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin: 10px 0; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+		<h3 style="margin: 0 0 10px 0; color: #333;">{ data.Title }</h3>
+		<p style="margin: 5px 0; color: #666;">{ data.Description }</p>
+		<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+			<div style="display: flex; justify-content: space-between; align-items: center;">
+				<span style="font-size: 24px; font-weight: bold; color: #007bff;">{ fmt.Sprint(data.Count) }</span>
+				<span style="font-size: 12px; color: #999;">{ data.Timestamp }</span>
+			</div>
+		</div>
+		if data.InitCalled {
+			<div style="margin-top: 10px; padding: 8px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; font-size: 12px; color: #155724;">
+				✓ Init() was called - component properly initialized
+			</div>
+		}
+	</div>
+}

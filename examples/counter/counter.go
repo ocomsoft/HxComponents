@@ -14,14 +14,14 @@ type CounterComponent struct {
 
 // OnIncrement is an event handler that increments the counter.
 // This method is called automatically when hxc-event=increment is received.
-func (c *CounterComponent) OnIncrement() error {
+func (c *CounterComponent) OnIncrement(ctx context.Context) error {
 	c.Count++
 	return nil
 }
 
 // OnDecrement is an event handler that decrements the counter.
 // This method is called automatically when hxc-event=decrement is received.
-func (c *CounterComponent) OnDecrement() error {
+func (c *CounterComponent) OnDecrement(ctx context.Context) error {
 	c.Count--
 	return nil
 }

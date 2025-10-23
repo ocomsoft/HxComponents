@@ -168,9 +168,10 @@ Request → Parse Form Data → BeforeEvent → On{EventName} → AfterEvent →
 - Return error to abort the request
 - Context provides request-scoped values and cancellation
 
-**On{EventName}() error**
+**On{EventName}(ctx context.Context) error**
 - Event handler method (e.g., `OnSubmit`, `OnAddItem`)
 - Called when `hxc-event` parameter matches the event name
+- Context provides request-scoped values and cancellation
 - Return error to indicate failure
 
 **AfterEvent(ctx context.Context, eventName string) error**
@@ -184,6 +185,137 @@ Request → Parse Form Data → BeforeEvent → On{EventName} → AfterEvent →
 - Use for final data transformations
 - Return error to indicate failure
 - Context provides request-scoped values and cancellation
+
+## Constructor Pattern with Init
+
+Components can use a constructor function pattern to be easily instantiated in templ templates while still having initialization logic. This is done using the `Init` interface.
+
+### The Init Interface
+
+```go
+type Initializer interface {
+    Init(ctx context.Context) error
+}
+```
+
+The `Init` method is called:
+- After form decoding (in HTTP handlers)
+- Before validation
+- Before event handling
+- Before processing
+
+### Example: Card Component with Constructor
+
+**Component struct:**
+```go
+package card
+
+import (
+    "context"
+    "fmt"
+    "time"
+)
+
+type CardComponent struct {
+    Title       string `form:"title"`
+    Count       int    `form:"count"`
+    Description string `json:"-"` // Computed field
+    Timestamp   string `json:"-"` // Computed field
+}
+
+// Constructor function for use in templ templates
+func NewCard(ctx context.Context, title string, count int) *CardComponent {
+    c := &CardComponent{
+        Title: title,
+        Count: count,
+    }
+    // Call Init to set up defaults and computed fields
+    _ = c.Init(ctx)
+    return c
+}
+
+// Init implements the Initializer interface
+func (c *CardComponent) Init(ctx context.Context) error {
+    // Set defaults
+    if c.Title == "" {
+        c.Title = "Untitled Card"
+    }
+
+    // Compute derived fields
+    c.Description = fmt.Sprintf("This card contains %d item(s)", c.Count)
+    c.Timestamp = time.Now().Format("2006-01-02 15:04:05")
+
+    // You could also load data from database here using ctx
+    // user, err := db.GetUser(ctx, userID)
+    // if err != nil {
+    //     return err
+    // }
+
+    return nil
+}
+
+// Render implements templ.Component
+func (c *CardComponent) Render(ctx context.Context, w io.Writer) error {
+    return CardTemplate(*c).Render(ctx, w)
+}
+```
+
+### Usage in Templ Templates
+
+```templ
+package pages
+
+import "myproject/components/card"
+
+templ Dashboard() {
+    <div class="dashboard">
+        <h1>Dashboard</h1>
+
+        // Use constructor to create components with specific values
+        @card.NewCard(ctx, "Active Users", 1250)
+        @card.NewCard(ctx, "Revenue", 45000)
+        @card.NewCard(ctx, "Orders", 328)
+
+        // All cards get Init() called automatically
+        // Computed fields like Description and Timestamp are set
+    </div>
+}
+```
+
+### Usage as HTMX Component
+
+The same component works as an HTMX endpoint:
+
+```html
+<form hx-post="/component/card" hx-target="#result">
+    <input name="title" placeholder="Card Title"/>
+    <input name="count" type="number" value="0"/>
+    <button>Create Card</button>
+</form>
+<div id="result"></div>
+```
+
+When submitted, the registry will:
+1. Decode form data into `CardComponent`
+2. Call `Init(ctx)` to set defaults and computed fields
+3. Call other lifecycle hooks if present
+4. Render the component
+
+### Benefits of Constructor Pattern
+
+1. **Type-Safe**: Constructor enforces required parameters at compile time
+2. **Reusable**: Same component works in templates AND as HTMX endpoint
+3. **Initialized**: Computed fields and defaults are always set
+4. **Context-Aware**: Can load data from database in `Init(ctx)`
+5. **Clean Templates**: `@NewCard(ctx, "Title", 100)` is cleaner than setting struct fields
+
+### Updated Lifecycle
+
+```
+Request → Parse Form → Init → Validate → BeforeEvent → On{EventName} → AfterEvent → Process → Render → Response
+                        ↑
+                        New step!
+```
 
 ## Development Workflow
 
