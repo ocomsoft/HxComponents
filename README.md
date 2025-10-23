@@ -31,7 +31,7 @@ The HTMX Generic Component Registry eliminates repetitive handler code by provid
 - 🔍 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Step-by-step solutions to common problems
 - 🐛 **[Common Gotchas](docs/COMMON_GOTCHAS.md)** - Known issues and workarounds
 - 🧪 **[Testing Guide](docs/TESTING.md)** - Testing strategies and examples
-- 🎯 **[Migration Guides](docs/)** - Migrate from React, Vue, or Svelte
+- 🎯 **[Migration Guides](docs/migration/)** - Migrate from React, Vue, or Svelte
 
 ### Quick Links
 
