@@ -12,10 +12,9 @@ import (
 
 var decoder = form.NewDecoder()
 
-// componentEntry stores the type information and render function for a registered component.
+// componentEntry stores the type information for a registered component.
 type componentEntry struct {
 	structType reflect.Type
-	render     func(interface{}) templ.Component
 }
 
 // ErrorHandler is a function that renders error responses
@@ -52,9 +51,9 @@ func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string,
 	}
 }
 
-// Register registers a component type with its render function.
+// Register registers a component type that implements templ.Component.
 // The name parameter is used in the URL path: /component/{name}
-// The render function takes a typed instance and returns a templ.Component.
+// The component type T must implement templ.Component's Render method.
 //
 // If the component type implements the Processor interface, its Process() method
 // will be called after form decoding and before rendering, allowing you to perform
@@ -62,15 +61,17 @@ func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string,
 //
 // Example:
 //
-//	components.Register(registry, "search", Search)
-func Register[T any](r *Registry, name string, render func(T) templ.Component) {
+//	components.Register[*login.LoginComponent](registry, "login")
+func Register[T templ.Component](r *Registry, name string) {
+	// Get the type - T is already a pointer type
+	var zero T
+	structType := reflect.TypeOf(zero)
+	if structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
+
 	r.components[name] = componentEntry{
-		structType: reflect.TypeOf((*T)(nil)).Elem(),
-		render: func(v interface{}) templ.Component {
-			// Convert pointer to value for render function
-			ptr := v.(*T)
-			return render(*ptr)
-		},
+		structType: structType,
 	}
 }
 
@@ -157,9 +158,16 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		// Apply response headers (after processing, so we capture any changes made during Process)
 		applyHxResponseHeaders(w, instance.Interface())
 
-		// Render component
+		// Render component - the instance itself implements templ.Component
 		w.Header().Set("Content-Type", "text/html")
-		component := entry.render(instance.Interface())
+		component, ok := instance.Interface().(templ.Component)
+		if !ok {
+			slog.Error("component does not implement templ.Component",
+				"component", componentName)
+			r.renderError(w, req, "Configuration Error", "Component does not implement templ.Component", http.StatusInternalServerError)
+			return
+		}
+
 		if err := component.Render(req.Context(), w); err != nil {
 			slog.Error("component render error",
 				"component", componentName,

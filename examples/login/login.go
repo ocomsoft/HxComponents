@@ -1,5 +1,10 @@
 package login
 
+import (
+	"context"
+	"io"
+)
+
 // LoginComponent represents the data for a login component.
 type LoginComponent struct {
 	Username string `form:"username"`
@@ -40,4 +45,11 @@ func (c *LoginComponent) Process() error {
 	// Invalid credentials
 	c.Error = "Invalid credentials"
 	return nil
+}
+
+// Render implements templ.Component interface.
+// This allows the component to be used both as an HTMX component
+// and as a regular templ component in templates.
+func (c *LoginComponent) Render(ctx context.Context, w io.Writer) error {
+	return Login(*c).Render(ctx, w)
 }

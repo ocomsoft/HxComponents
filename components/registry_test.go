@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -34,19 +33,17 @@ func (f *TestLoginForm) GetHxRedirect() string {
 	return f.RedirectTo
 }
 
-// Test templ component
-func renderTestLoginComponent(data TestLoginForm) templ.Component {
-	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		if data.Error != "" {
-			_, err := w.Write([]byte("<div class=\"error\">" + data.Error + "</div>"))
-			return err
-		}
-		if data.RedirectTo != "" {
-			_, err := w.Write([]byte("<div class=\"success\">Login successful!</div>"))
-			return err
-		}
-		return nil
-	})
+// Render implements templ.Component interface for TestLoginForm
+func (f *TestLoginForm) Render(ctx context.Context, w io.Writer) error {
+	if f.Error != "" {
+		_, err := w.Write([]byte("<div class=\"error\">" + f.Error + "</div>"))
+		return err
+	}
+	if f.RedirectTo != "" {
+		_, err := w.Write([]byte("<div class=\"success\">Login successful!</div>"))
+		return err
+	}
+	return nil
 }
 
 func TestProcessorAndRedirect(t *testing.T) {
@@ -54,7 +51,7 @@ func TestProcessorAndRedirect(t *testing.T) {
 	registry := NewRegistry()
 
 	// Register login component
-	Register(registry, "login", renderTestLoginComponent)
+	Register[*TestLoginForm](registry, "login")
 
 	// Create router
 	router := chi.NewRouter()
@@ -133,16 +130,15 @@ func (f *TestMethodForm) SetHttpMethod(method string) {
 	f.Method = method
 }
 
-func testMethodComponent(data TestMethodForm) templ.Component {
-	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		_, err := w.Write([]byte("<div>Method: " + data.Method + "</div>"))
-		return err
-	})
+// Render implements templ.Component interface for TestMethodForm
+func (f *TestMethodForm) Render(ctx context.Context, w io.Writer) error {
+	_, err := w.Write([]byte("<div>Method: " + f.Method + "</div>"))
+	return err
 }
 
 func TestHttpMethodInterface(t *testing.T) {
 	registry := NewRegistry()
-	Register(registry, "test", testMethodComponent)
+	Register[*TestMethodForm](registry, "test")
 
 	router := chi.NewRouter()
 	router.Get("/component/*", registry.Handler)
@@ -179,8 +175,8 @@ func TestHttpMethodInterface(t *testing.T) {
 
 func TestHandlerURLExtraction(t *testing.T) {
 	registry := NewRegistry()
-	Register(registry, "search", testMethodComponent)
-	Register(registry, "login", renderTestLoginComponent)
+	Register[*TestMethodForm](registry, "search")
+	Register[*TestLoginForm](registry, "login")
 
 	tests := []struct {
 		name          string

@@ -1,5 +1,10 @@
 package profile
 
+import (
+	"context"
+	"io"
+)
+
 // ProfileComponent represents the data for a user profile component.
 type ProfileComponent struct {
 	Name        string   `form:"name"`
@@ -28,4 +33,11 @@ func (c *ProfileComponent) Process() error {
 	// In a real app, you might redirect to the profile view page
 	// c.LocationURL = "/profile/view"
 	return nil
+}
+
+// Render implements templ.Component interface.
+// This allows the component to be used both as an HTMX component
+// and as a regular templ component in templates.
+func (c *ProfileComponent) Render(ctx context.Context, w io.Writer) error {
+	return Profile(*c).Render(ctx, w)
 }

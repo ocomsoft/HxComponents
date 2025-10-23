@@ -30,18 +30,28 @@ go get github.com/ocomsoft/HxComponents
 
 ### Basic Example
 
-**1. Define your component data struct:**
+**1. Define your component struct that implements templ.Component:**
 
 ```go
 package mycomponent
+
+import (
+    "context"
+    "io"
+)
 
 type SearchComponent struct {
     Query string `form:"q"`
     Limit int    `form:"limit"`
 }
+
+// Render implements templ.Component interface
+func (c *SearchComponent) Render(ctx context.Context, w io.Writer) error {
+    return Search(*c).Render(ctx, w)
+}
 ```
 
-**2. Create a templ component:**
+**2. Create a templ template:**
 
 ```templ
 package mycomponent
@@ -67,16 +77,17 @@ import (
 
 func main() {
     registry := components.NewRegistry()
-    components.Register(registry, "search", mycomponent.SearchComponent)
+    components.Register[*mycomponent.SearchComponent](registry, "search")
 
     router := chi.NewRouter()
-    registry.Mount(router)
+    router.Get("/component/*", registry.Handler)
+    router.Post("/component/*", registry.Handler)
 
     http.ListenAndServe(":8080", router)
 }
 ```
 
-**4. Use in HTML:**
+**4. Use in HTML (HTMX):**
 
 ```html
 <form hx-post="/component/search" hx-target="#results">
@@ -87,7 +98,21 @@ func main() {
 <div id="results"></div>
 ```
 
-**5. Or use with GET for initial state:**
+**5. Or use in templ templates (server-side):**
+
+```templ
+templ MyPage() {
+    <h1>Search Results</h1>
+    // Use the component directly - it implements templ.Component!
+    @(&mycomponent.SearchComponent{Query: "golang", Limit: 10})
+}
+```
+
+The same component works both ways:
+- As an **HTMX component** that handles dynamic POST/GET requests
+- As a **templ component** that can be embedded in other templates
+
+**6. Or use with GET for initial state:**
 
 ```html
 <!-- Load component with query parameters -->
@@ -522,12 +547,21 @@ This ensures:
 #### `NewRegistry() *Registry`
 Creates a new component registry.
 
-#### `Register[T any](r *Registry, name string, render func(T) templ.Component)`
-Registers a component with type-safe rendering function.
+#### `Register[T templ.Component](r *Registry, name string)`
+Registers a component type that implements templ.Component.
 
 **Parameters:**
+- `T` - Component type (must be a pointer type that implements templ.Component)
 - `name` - Component name used to identify the component
-- `render` - Function that takes typed data and returns templ.Component
+
+**Example:**
+```go
+components.Register[*mycomponent.SearchComponent](registry, "search")
+```
+
+**Requirements:**
+- The component type must implement `templ.Component` interface
+- The component must have a `Render(ctx context.Context, w io.Writer) error` method
 
 #### `Handler(w http.ResponseWriter, req *http.Request)`
 Extracts the component name from the URL path and renders the component. The component name is extracted from the last segment of the URL path after the last slash. This allows for wildcard routing patterns.

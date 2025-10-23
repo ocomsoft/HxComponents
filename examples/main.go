@@ -19,9 +19,10 @@ func main() {
 
 	// Register components
 	// The registry will automatically call Process() if the component implements the Processor interface
-	components.Register(registry, "search", search.Search)
-	components.Register(registry, "login", login.Login)
-	components.Register(registry, "profile", profile.Profile)
+	// Components must implement templ.Component interface
+	components.Register[*search.SearchComponent](registry, "search")
+	components.Register[*login.LoginComponent](registry, "login")
+	components.Register[*profile.ProfileComponent](registry, "profile")
 
 	// Setup router
 	router := chi.NewRouter()
@@ -34,10 +35,14 @@ func main() {
 
 	// Serve pages using templ
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		pages.IndexPage().Render(r.Context(), w)
+		if err := pages.IndexPage().Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 	router.Get("/dashboard", func(w http.ResponseWriter, r *http.Request) {
-		pages.DashboardPage().Render(r.Context(), w)
+		if err := pages.DashboardPage().Render(r.Context(), w); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 
 	log.Println("Server starting on http://localhost:8080")
