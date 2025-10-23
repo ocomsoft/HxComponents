@@ -1,4 +1,4 @@
-# Router Integration Examples
+# Examples
 
 This document demonstrates how to use the HxComponents registry with different Go HTTP routers.
 
