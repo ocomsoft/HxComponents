@@ -1,6 +1,9 @@
 package pages
 
-import "github.com/ocomsoft/HxComponents/examples/search"
+import (
+	"github.com/ocomsoft/HxComponents/examples/search"
+	"github.com/ocomsoft/HxComponents/examples/counter"
+)
 
 templ IndexPage() {
 	<!DOCTYPE html>
@@ -16,9 +19,19 @@ templ IndexPage() {
 			<h1>HTMX Generic Component Registry - Demo</h1>
 			@introSection()
 			<div class="container">
-				<h2>Example: Using Component in Template</h2>
-				<p>This search component is rendered server-side with initial values:</p>
+				<h2>Example: Using Components in Templates</h2>
+
+				<h3 style="margin-top: 20px; color: #666;">Counter Component</h3>
+				<p>This counter is embedded in the page template and updates itself via HTMX with <code>hx-vals</code>:</p>
 				// Use the component directly in the template - it implements templ.Component!
+				@(&counter.CounterComponent{Count: 0})
+				<p style="margin-top: 10px; color: #666; font-size: 14px;">
+					The counter above was rendered directly in this page template.
+					When you click the buttons, it POSTs to <code>/component/counter</code> and replaces itself.
+				</p>
+
+				<h3 style="margin-top: 20px; color: #666;">Search Component</h3>
+				<p>This search component is also rendered server-side with initial values:</p>
 				@(&search.SearchComponent{Query: "Initial search", Limit: 5})
 				<p style="margin-top: 10px; color: #666; font-size: 14px;">
 					The component above was rendered directly in this page template.

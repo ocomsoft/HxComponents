@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/ocomsoft/HxComponents/components"
+	"github.com/ocomsoft/HxComponents/examples/counter"
 	"github.com/ocomsoft/HxComponents/examples/login"
 	"github.com/ocomsoft/HxComponents/examples/pages"
 	"github.com/ocomsoft/HxComponents/examples/profile"
@@ -23,6 +24,7 @@ func main() {
 	components.Register[*search.SearchComponent](registry, "search")
 	components.Register[*login.LoginComponent](registry, "login")
 	components.Register[*profile.ProfileComponent](registry, "profile")
+	components.Register[*counter.CounterComponent](registry, "counter")
 
 	// Setup router
 	router := chi.NewRouter()

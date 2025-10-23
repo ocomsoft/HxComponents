@@ -1,0 +1,29 @@
+package counter
+
+import "fmt"
+
+templ Counter(data CounterComponent) {
+	<div class="counter-component" style="display: inline-flex; align-items: center; gap: 15px; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #dee2e6;">
+		<button
+			hx-post="/component/counter"
+			hx-vals={ fmt.Sprintf(`{"count": %d, "action": "decrement"}`, data.Count) }
+			hx-target="closest .counter-component"
+			hx-swap="outerHTML"
+			style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 18px; font-weight: bold;"
+		>
+			−
+		</button>
+		<span style="font-size: 24px; font-weight: bold; min-width: 50px; text-align: center;">
+			{ fmt.Sprint(data.Count) }
+		</span>
+		<button
+			hx-post="/component/counter"
+			hx-vals={ fmt.Sprintf(`{"count": %d, "action": "increment"}`, data.Count) }
+			hx-target="closest .counter-component"
+			hx-swap="outerHTML"
+			style="background: #28a745; color: white; border: none; border-radius: 4px; padding: 8px 16px; cursor: pointer; font-size: 18px; font-weight: bold;"
+		>
+			+
+		</button>
+	</div>
+}
