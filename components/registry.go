@@ -25,7 +25,7 @@ import (
 	"github.com/go-playground/form/v4"
 )
 
-var decoder = form.NewDecoder()
+var defaultDecoder = form.NewDecoder()
 
 // componentEntry stores the type information for a registered component.
 type componentEntry struct {
@@ -41,6 +41,7 @@ type Registry struct {
 	mu           sync.RWMutex
 	components   map[string]componentEntry
 	errorHandler ErrorHandler
+	debugMode    bool
 }
 
 // NewRegistry creates a new component registry with the default error handler.
@@ -55,6 +56,36 @@ func NewRegistry() *Registry {
 // The error handler is responsible for rendering error responses.
 func (r *Registry) SetErrorHandler(handler ErrorHandler) {
 	r.errorHandler = handler
+}
+
+// EnableDebugMode enables debug mode for the registry.
+// When enabled, additional debugging headers are added to responses:
+//   - X-HxComponent-Name: The component name
+//   - X-HxComponent-FormFields: Number of form fields received
+//   - X-HxComponent-HasEvent: Whether an event was processed
+//
+// This is useful during development to understand component rendering.
+// WARNING: Do not enable in production as it exposes internal details.
+func (r *Registry) EnableDebugMode() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.debugMode = true
+	slog.Info("debug mode enabled for component registry")
+}
+
+// DisableDebugMode disables debug mode for the registry.
+func (r *Registry) DisableDebugMode() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.debugMode = false
+	slog.Info("debug mode disabled for component registry")
+}
+
+// IsDebugMode returns whether debug mode is currently enabled.
+func (r *Registry) IsDebugMode() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.debugMode
 }
 
 // defaultErrorHandler is the default error handler that renders the ErrorComponent
@@ -154,6 +185,82 @@ func Register[T templ.Component](r *Registry, name string) {
 // HandlerFor returns an http.HandlerFunc for rendering a specific component.
 // This allows you to mount components at any URL path using any router.
 //
+// Component Request Lifecycle:
+//
+//	┌──────────────────────┐
+//	│   HTTP Request       │
+//	│  (GET/POST)          │
+//	└──────────┬───────────┘
+//	           │
+//	           ▼
+//	┌──────────────────────┐
+//	│   Parse Form Data    │
+//	│  (query/body params) │
+//	└──────────┬───────────┘
+//	           │
+//	           ▼
+//	┌──────────────────────┐
+//	│  Decode into Struct  │
+//	│  (form tags)         │
+//	└──────────┬───────────┘
+//	           │
+//	           ▼
+//	┌──────────────────────┐
+//	│  Apply Request       │
+//	│  Headers (HX-*)      │
+//	└──────────┬───────────┘
+//	           │
+//	           ▼
+//	     ┌─────────────┐
+//	     │ Has Event?  │
+//	     │ (hxc-event) │
+//	     └──┬──────┬───┘
+//	        │ YES  │ NO
+//	        │      └─────────────────┐
+//	        ▼                        │
+//	┌──────────────────────┐         │
+//	│  BeforeEvent(ctx)    │         │
+//	│  (optional hook)     │         │
+//	└──────────┬───────────┘         │
+//	           │                     │
+//	           ▼                     │
+//	┌──────────────────────┐         │
+//	│  On{EventName}()     │         │
+//	│  (event handler)     │         │
+//	└──────────┬───────────┘         │
+//	           │                     │
+//	           ▼                     │
+//	┌──────────────────────┐         │
+//	│  AfterEvent(ctx)     │         │
+//	│  (optional hook)     │         │
+//	└──────────┬───────────┘         │
+//	           │                     │
+//	           └──────┬──────────────┘
+//	                  │
+//	                  ▼
+//	         ┌──────────────────────┐
+//	         │  Process(ctx)        │
+//	         │  (optional)          │
+//	         └──────────┬───────────┘
+//	                    │
+//	                    ▼
+//	         ┌──────────────────────┐
+//	         │  Apply Response      │
+//	         │  Headers (HX-*)      │
+//	         └──────────┬───────────┘
+//	                    │
+//	                    ▼
+//	         ┌──────────────────────┐
+//	         │  Render(ctx, w)      │
+//	         │  (templ.Component)   │
+//	         └──────────┬───────────┘
+//	                    │
+//	                    ▼
+//	         ┌──────────────────────┐
+//	         │   HTTP Response      │
+//	         │   (HTML)             │
+//	         └──────────────────────┘
+//
 // Example with net/http:
 //
 //	http.HandleFunc("/search", registry.HandlerFor("search"))
@@ -192,7 +299,10 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 
 		slog.Debug("rendering component",
 			"component", componentName,
-			"method", req.Method)
+			"method", req.Method,
+			"remote_addr", req.RemoteAddr,
+			"user_agent", req.UserAgent(),
+			"content_type", req.Header.Get("Content-Type"))
 
 		if err := req.ParseForm(); err != nil {
 			slog.Error("form parse error",
@@ -213,6 +323,14 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 			formData = req.Form
 		}
 
+		// Use component's custom decoder if provided, otherwise use default
+		decoder := defaultDecoder
+		if customDecoder, ok := instance.Interface().(FormDecoder); ok {
+			decoder = customDecoder.GetFormDecoder()
+			slog.Debug("using custom form decoder",
+				"component", componentName)
+		}
+
 		if err := decoder.Decode(instance.Interface(), formData); err != nil {
 			slog.Error("form decode error",
 				"component", componentName,
@@ -225,13 +343,19 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		applyHxHeaders(instance.Interface(), req)
 
 		// Handle event-driven processing if hxc-event parameter is present
+		hasEvent := false
 		if eventNames, ok := formData["hxc-event"]; ok && len(eventNames) > 0 {
+			hasEvent = true
 			eventName := eventNames[0]
+			slog.Debug("processing event",
+				"component", componentName,
+				"event", eventName)
 			if err := r.handleEvent(req.Context(), instance.Interface(), eventName, componentName); err != nil {
 				slog.Error("event handler error",
 					"component", componentName,
 					"event", eventName,
-					"error", err)
+					"error", err,
+					"remote_addr", req.RemoteAddr)
 				r.renderError(w, req, "Event Error", fmt.Sprintf("Event '%s' failed: %v", eventName, err), http.StatusInternalServerError)
 				return
 			}
@@ -250,6 +374,17 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 
 		// Apply response headers (after processing, so we capture any changes made during Process)
 		applyHxResponseHeaders(w, instance.Interface())
+
+		// Add debug headers if debug mode is enabled
+		if r.IsDebugMode() {
+			w.Header().Set("X-HxComponent-Name", componentName)
+			w.Header().Set("X-HxComponent-FormFields", fmt.Sprintf("%d", len(req.Form)))
+			if hasEvent {
+				w.Header().Set("X-HxComponent-HasEvent", "true")
+			} else {
+				w.Header().Set("X-HxComponent-HasEvent", "false")
+			}
+		}
 
 		// Render component - the instance itself implements templ.Component
 		w.Header().Set("Content-Type", "text/html")
@@ -270,7 +405,9 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		}
 
 		slog.Debug("component rendered successfully",
-			"component", componentName)
+			"component", componentName,
+			"has_event", hasEvent,
+			"form_fields", len(req.Form))
 	}
 }
 
