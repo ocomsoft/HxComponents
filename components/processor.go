@@ -1,11 +1,17 @@
 package components
 
+import "context"
+
 // Processor is an optional interface that components can implement to perform
 // processing logic before rendering. This is useful for validation, business logic,
-// data transformation, or setting response headers based on processing results.
+// data transformation, database queries, or setting response headers based on processing results.
 //
 // The Process method is called after form data is decoded and request headers are applied,
 // but before response headers are applied and the component is rendered.
+//
+// The context parameter provides request-scoped values and cancellation signals,
+// which is useful for database queries, API calls, and other operations that may
+// need to be cancelled or have timeouts.
 //
 // Example:
 //
@@ -16,8 +22,14 @@ package components
 //	    Error      string `json:"-"`
 //	}
 //
-//	func (f *LoginForm) Process() error {
-//	    if f.Username == "demo" && f.Password == "password" {
+//	func (f *LoginForm) Process(ctx context.Context) error {
+//	    // Can use ctx for database queries, timeouts, etc.
+//	    user, err := db.FindUser(ctx, f.Username)
+//	    if err != nil {
+//	        return fmt.Errorf("database error: %w", err)
+//	    }
+//
+//	    if user != nil && user.CheckPassword(f.Password) {
 //	        f.RedirectTo = "/dashboard"
 //	        return nil
 //	    }
@@ -29,5 +41,5 @@ package components
 // or business logic errors should be stored in the struct fields and rendered
 // in the template.
 type Processor interface {
-	Process() error
+	Process(ctx context.Context) error
 }

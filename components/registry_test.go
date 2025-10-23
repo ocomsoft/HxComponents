@@ -20,7 +20,7 @@ type TestLoginForm struct {
 	Error      string
 }
 
-func (f *TestLoginForm) Process() error {
+func (f *TestLoginForm) Process(ctx context.Context) error {
 	if f.Username == "demo" && f.Password == "password" {
 		f.RedirectTo = "/dashboard"
 		return nil
@@ -179,10 +179,10 @@ func TestHandlerURLExtraction(t *testing.T) {
 	Register[*TestLoginForm](registry, "login")
 
 	tests := []struct {
-		name          string
-		url           string
-		expectedBody  string
-		expectedCode  int
+		name         string
+		url          string
+		expectedBody string
+		expectedCode int
 	}{
 		{
 			name:         "extract component from /component/search",

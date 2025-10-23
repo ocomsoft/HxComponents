@@ -29,7 +29,7 @@ func (c *LoginComponent) GetHxRefresh() bool {
 // Process implements the Processor interface to handle login logic.
 // This is called automatically by the registry after form decoding
 // and before rendering the component.
-func (c *LoginComponent) Process() error {
+func (c *LoginComponent) Process(ctx context.Context) error {
 	// Simple validation for demo purposes
 	if c.Username == "" || c.Password == "" {
 		c.Error = "Username and password are required"

@@ -30,7 +30,7 @@ type TodoListComponent struct {
 
 // BeforeEvent is called before any event handler.
 // This demonstrates validation and setup logic that runs for all events.
-func (t *TodoListComponent) BeforeEvent(eventName string) error {
+func (t *TodoListComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList BeforeEvent", "event", eventName)
 
 	// Deserialize items from JSON (stateless approach)
@@ -45,7 +45,7 @@ func (t *TodoListComponent) BeforeEvent(eventName string) error {
 
 // AfterEvent is called after an event handler succeeds.
 // This demonstrates cleanup or side effects that run after events.
-func (t *TodoListComponent) AfterEvent(eventName string) error {
+func (t *TodoListComponent) AfterEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList AfterEvent", "event", eventName)
 
 	// Track the last event and count
@@ -130,7 +130,7 @@ func (t *TodoListComponent) OnClearCompleted() error {
 
 // Process is still called after events complete.
 // This demonstrates that you can still use Process() for final logic.
-func (t *TodoListComponent) Process() error {
+func (t *TodoListComponent) Process(ctx context.Context) error {
 	// Deserialize items from JSON if not already done (for non-event requests)
 	if len(t.Items) == 0 && t.ItemsJSON != "" {
 		if err := json.Unmarshal([]byte(t.ItemsJSON), &t.Items); err != nil {

@@ -21,7 +21,7 @@ type TestEventComponent struct {
 	EventsHistory []string `json:"-"`
 }
 
-func (t *TestEventComponent) BeforeEvent(eventName string) error {
+func (t *TestEventComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	t.EventsHistory = append(t.EventsHistory, fmt.Sprintf("BeforeEvent:%s", eventName))
 	return nil
 }
@@ -43,12 +43,12 @@ func (t *TestEventComponent) OnError() error {
 	return fmt.Errorf("intentional error")
 }
 
-func (t *TestEventComponent) AfterEvent(eventName string) error {
+func (t *TestEventComponent) AfterEvent(ctx context.Context, eventName string) error {
 	t.EventsHistory = append(t.EventsHistory, fmt.Sprintf("AfterEvent:%s", eventName))
 	return nil
 }
 
-func (t *TestEventComponent) Process() error {
+func (t *TestEventComponent) Process(ctx context.Context) error {
 	t.EventsHistory = append(t.EventsHistory, "Process")
 	return nil
 }
@@ -64,7 +64,7 @@ type TestBeforeEventErrorComponent struct {
 	Called bool `json:"-"`
 }
 
-func (t *TestBeforeEventErrorComponent) BeforeEvent(eventName string) error {
+func (t *TestBeforeEventErrorComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	return fmt.Errorf("before event error")
 }
 
@@ -89,11 +89,11 @@ func (t *TestAfterEventErrorComponent) OnDoSomething() error {
 	return nil
 }
 
-func (t *TestAfterEventErrorComponent) AfterEvent(eventName string) error {
+func (t *TestAfterEventErrorComponent) AfterEvent(ctx context.Context, eventName string) error {
 	return fmt.Errorf("after event error")
 }
 
-func (t *TestAfterEventErrorComponent) Process() error {
+func (t *TestAfterEventErrorComponent) Process(ctx context.Context) error {
 	t.ProcessCalled = true
 	return nil
 }

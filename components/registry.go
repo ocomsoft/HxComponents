@@ -1,10 +1,25 @@
+// Package components provides a type-safe, HTMX-based component registry
+// for building dynamic web applications with Go and templ.
+//
+// The registry eliminates boilerplate by providing automatic form parsing,
+// HTMX header handling, event-driven processing, and type-safe rendering.
+//
+// Example usage:
+//
+//	registry := components.NewRegistry()
+//	components.Register[*MyComponent](registry, "mycomponent")
+//	http.HandleFunc("/component/", registry.Handler)
 package components
 
 import (
+	"context"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"reflect"
+	"strings"
+	"sync"
 
 	"github.com/a-h/templ"
 	"github.com/go-playground/form/v4"
@@ -21,7 +36,9 @@ type componentEntry struct {
 type ErrorHandler func(w http.ResponseWriter, req *http.Request, title string, message string, code int)
 
 // Registry manages component registration and handles HTTP requests for component rendering.
+// It is safe for concurrent use by multiple goroutines.
 type Registry struct {
+	mu           sync.RWMutex
 	components   map[string]componentEntry
 	errorHandler ErrorHandler
 }
@@ -45,9 +62,25 @@ func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string,
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(code)
 	if err := ErrorComponent(title, message, code).Render(req.Context(), w); err != nil {
-		slog.Error("failed to render error component", "error", err)
-		// Fallback to plain text error
-		fmt.Fprintf(w, "<div>%s: %s (Code: %d)</div>", title, message, code)
+		slog.Error("failed to render error component",
+			"error", err,
+			"title", title,
+			"message", message,
+			"code", code,
+			"path", req.URL.Path)
+
+		// Fallback to plain HTML with proper escaping
+		fmt.Fprintf(w,
+			`<div style="border:2px solid red;padding:1em;margin:1em">
+				<h3>%s</h3>
+				<p>%s</p>
+				<small>Error Code: %d</small>
+				<hr>
+				<small>Additionally, the error template failed to render.</small>
+			</div>`,
+			html.EscapeString(title),
+			html.EscapeString(message),
+			code)
 	}
 }
 
@@ -77,13 +110,42 @@ func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string,
 // The package-level generic function is the idiomatic Go approach for this pattern.
 // See: https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md
 func Register[T templ.Component](r *Registry, name string) {
+	// Validate component name
+	if name == "" {
+		panic("component name cannot be empty")
+	}
+
 	// Get the type - T is already a pointer type
 	var zero T
 	structType := reflect.TypeOf(zero)
-	if structType.Kind() == reflect.Ptr {
-		structType = structType.Elem()
+
+	// Validate that T is a pointer type
+	if structType == nil || structType.Kind() != reflect.Ptr {
+		panic(fmt.Sprintf("component type must be a pointer type, got %T", zero))
 	}
 
+	// Validate that the pointer points to a struct
+	if structType.Elem().Kind() != reflect.Struct {
+		panic(fmt.Sprintf("component must point to a struct, got %T", zero))
+	}
+
+	// Validate that the component implements templ.Component
+	// This is enforced at compile time by the generic constraint,
+	// but we verify it here for runtime safety
+	if _, ok := interface{}(zero).(templ.Component); !ok {
+		panic(fmt.Sprintf("component type %T does not implement templ.Component", zero))
+	}
+
+	// Thread-safe registration
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Check for duplicate registration
+	if _, exists := r.components[name]; exists {
+		panic(fmt.Sprintf("component '%s' already registered", name))
+	}
+
+	structType = structType.Elem()
 	r.components[name] = componentEntry{
 		structType: structType,
 	}
@@ -115,7 +177,11 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 			return
 		}
 
+		// Thread-safe component lookup
+		r.mu.RLock()
 		entry, exists := r.components[componentName]
+		r.mu.RUnlock()
+
 		if !exists {
 			slog.Warn("component not found",
 				"component", componentName,
@@ -161,7 +227,7 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		// Handle event-driven processing if hxc-event parameter is present
 		if eventNames, ok := formData["hxc-event"]; ok && len(eventNames) > 0 {
 			eventName := eventNames[0]
-			if err := r.handleEvent(instance.Interface(), eventName, componentName); err != nil {
+			if err := r.handleEvent(req.Context(), instance.Interface(), eventName, componentName); err != nil {
 				slog.Error("event handler error",
 					"component", componentName,
 					"event", eventName,
@@ -173,7 +239,7 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 
 		// Call Process if the component implements the Processor interface
 		if processor, ok := instance.Interface().(Processor); ok {
-			if err := processor.Process(); err != nil {
+			if err := processor.Process(req.Context()); err != nil {
 				slog.Error("component process error",
 					"component", componentName,
 					"error", err)
@@ -211,13 +277,13 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 // handleEvent processes event-driven method calls on a component.
 // It implements the lifecycle: BeforeEvent → On{EventName} → AfterEvent
 // Returns an error if any step fails, stopping further processing.
-func (r *Registry) handleEvent(instance interface{}, eventName, componentName string) error {
+func (r *Registry) handleEvent(ctx context.Context, instance interface{}, eventName, componentName string) error {
 	// Call BeforeEvent hook if component implements it
 	if beforeHandler, ok := instance.(BeforeEventHandler); ok {
 		slog.Debug("calling BeforeEvent hook",
 			"component", componentName,
 			"event", eventName)
-		if err := beforeHandler.BeforeEvent(eventName); err != nil {
+		if err := beforeHandler.BeforeEvent(ctx, eventName); err != nil {
 			return fmt.Errorf("BeforeEvent failed: %w", err)
 		}
 	}
@@ -253,7 +319,7 @@ func (r *Registry) handleEvent(instance interface{}, eventName, componentName st
 		slog.Debug("calling AfterEvent hook",
 			"component", componentName,
 			"event", eventName)
-		if err := afterHandler.AfterEvent(eventName); err != nil {
+		if err := afterHandler.AfterEvent(ctx, eventName); err != nil {
 			return fmt.Errorf("AfterEvent failed: %w", err)
 		}
 	}
@@ -267,14 +333,7 @@ func capitalize(s string) string {
 	if s == "" {
 		return ""
 	}
-	runes := []rune(s)
-	runes[0] = rune(s[0] - 32) // Convert first char to uppercase
-	// Only capitalize if it was lowercase
-	if runes[0] >= 'A' && runes[0] <= 'Z' {
-		return string(runes)
-	}
-	// Return original if first char wasn't lowercase
-	return s
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 // Handler extracts the component name from the URL path and renders the component.

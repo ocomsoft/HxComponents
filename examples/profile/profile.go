@@ -23,7 +23,7 @@ func (c *ProfileComponent) GetHxLocation() string {
 // Process implements the Processor interface to handle profile update logic.
 // This is called automatically by the registry after form decoding
 // and before rendering the component.
-func (c *ProfileComponent) Process() error {
+func (c *ProfileComponent) Process(ctx context.Context) error {
 	// Simple validation
 	if c.Name == "" || c.Email == "" {
 		return nil
