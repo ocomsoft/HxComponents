@@ -26,6 +26,9 @@ templ TodoList(data TodoListComponent) {
 			</div>
 		}
 
+		<!-- Hidden field to maintain state (stateless component) -->
+		<input type="hidden" name="items" value={ data.GetItemsJSON() }/>
+
 		<!-- Add new item form -->
 		<div style="margin-bottom: 20px;">
 			<div style="display: flex; gap: 10px;">
@@ -38,7 +41,7 @@ templ TodoList(data TodoListComponent) {
 				/>
 				<button
 					hx-post="/component/todolist"
-					hx-include="[name='newItemText']"
+					hx-include="[name='newItemText'], [name='items']"
 					hx-vals='{"hxc-event": "addItem"}'
 					hx-target="closest .todo-list-component"
 					hx-swap="outerHTML"
@@ -69,6 +72,7 @@ templ TodoList(data TodoListComponent) {
 							type="checkbox"
 							checked?={ item.Completed }
 							hx-post="/component/todolist"
+							hx-include="[name='items']"
 							hx-vals={ fmt.Sprintf(`{"itemId": %d, "hxc-event": "toggleItem"}`, item.ID) }
 							hx-target="closest .todo-list-component"
 							hx-swap="outerHTML"
@@ -89,6 +93,7 @@ templ TodoList(data TodoListComponent) {
 						<!-- Delete button -->
 						<button
 							hx-post="/component/todolist"
+							hx-include="[name='items']"
 							hx-vals={ fmt.Sprintf(`{"itemId": %d, "hxc-event": "deleteItem"}`, item.ID) }
 							hx-target="closest .todo-list-component"
 							hx-swap="outerHTML"
@@ -107,6 +112,7 @@ templ TodoList(data TodoListComponent) {
 			<div style="margin-top: 15px; text-align: right;">
 				<button
 					hx-post="/component/todolist"
+					hx-include="[name='items']"
 					hx-vals='{"hxc-event": "clearCompleted"}'
 					hx-target="closest .todo-list-component"
 					hx-swap="outerHTML"

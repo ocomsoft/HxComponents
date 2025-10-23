@@ -2,6 +2,7 @@ package todolist
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,8 +18,10 @@ type TodoItem struct {
 
 // TodoListComponent demonstrates the full event-driven lifecycle with hooks.
 // It shows BeforeEvent, multiple event handlers, and AfterEvent.
+// This is a stateless component - all state is passed via form fields.
 type TodoListComponent struct {
 	Items       []TodoItem `json:"-"`
+	ItemsJSON   string     `form:"items"` // Hidden field containing JSON-encoded items
 	NewItemText string     `form:"newItemText"`
 	ItemID      int        `form:"itemId"`
 	LastEvent   string     `json:"-"`
@@ -30,8 +33,12 @@ type TodoListComponent struct {
 func (t *TodoListComponent) BeforeEvent(eventName string) error {
 	slog.Info("TodoList BeforeEvent", "event", eventName)
 
-	// Example: You could validate authentication here
-	// For demo purposes, we just log
+	// Deserialize items from JSON (stateless approach)
+	if t.ItemsJSON != "" {
+		if err := json.Unmarshal([]byte(t.ItemsJSON), &t.Items); err != nil {
+			return fmt.Errorf("failed to unmarshal items: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -54,8 +61,8 @@ func (t *TodoListComponent) OnAddItem() error {
 		return fmt.Errorf("item text cannot be empty")
 	}
 
-	// Generate new ID
-	newID := len(t.Items) + 1
+	// Generate new ID (find max ID and increment)
+	newID := 1
 	for _, item := range t.Items {
 		if item.ID >= newID {
 			newID = item.ID + 1
@@ -69,10 +76,11 @@ func (t *TodoListComponent) OnAddItem() error {
 		Completed: false,
 	})
 
+	slog.Info("Added todo item", "id", newID, "text", t.NewItemText)
+
 	// Clear the input
 	t.NewItemText = ""
 
-	slog.Info("Added todo item", "id", newID, "text", t.NewItemText)
 	return nil
 }
 
@@ -123,7 +131,13 @@ func (t *TodoListComponent) OnClearCompleted() error {
 // Process is still called after events complete.
 // This demonstrates that you can still use Process() for final logic.
 func (t *TodoListComponent) Process() error {
-	// Add a timestamp or other global logic here if needed
+	// Deserialize items from JSON if not already done (for non-event requests)
+	if len(t.Items) == 0 && t.ItemsJSON != "" {
+		if err := json.Unmarshal([]byte(t.ItemsJSON), &t.Items); err != nil {
+			return fmt.Errorf("failed to unmarshal items: %w", err)
+		}
+	}
+
 	slog.Debug("TodoList Process called", "itemCount", len(t.Items), "lastEvent", t.LastEvent)
 	return nil
 }
@@ -160,4 +174,18 @@ func (t *TodoListComponent) GetCompletedCount() int {
 // GetTimestamp returns the current timestamp for display.
 func (t *TodoListComponent) GetTimestamp() string {
 	return time.Now().Format("15:04:05")
+}
+
+// GetItemsJSON serializes the items to JSON for the hidden field.
+// This enables stateless operation by passing all state in form data.
+func (t *TodoListComponent) GetItemsJSON() string {
+	if len(t.Items) == 0 {
+		return "[]"
+	}
+	data, err := json.Marshal(t.Items)
+	if err != nil {
+		slog.Error("failed to marshal items to JSON", "error", err)
+		return "[]"
+	}
+	return string(data)
 }
