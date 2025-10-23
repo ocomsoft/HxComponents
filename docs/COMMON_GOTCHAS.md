@@ -2,6 +2,8 @@
 
 This guide covers common issues you might encounter when working with HxComponents and how to solve them.
 
+> **📖 For detailed troubleshooting**, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) which includes step-by-step solutions, debugging tips, and common error messages.
+
 ## 1. State Doesn't Persist Between Requests
 
 **Problem:** Components are stateless - each request creates a new instance.

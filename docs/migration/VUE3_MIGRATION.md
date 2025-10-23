@@ -1,25 +1,51 @@
-# Migrating from Vue 2 to HxComponents
+# Migrating from Vue 3 to HxComponents
 
-This guide demonstrates how to convert Vue 2 components to the HxComponents architecture, mapping Vue concepts to Go/HTMX patterns.
+This guide demonstrates how to convert Vue 3 components (including Composition API) to the HxComponents architecture, mapping Vue 3 concepts to Go/HTMX patterns.
 
 ## Architecture Comparison
 
-| Vue 2 Concept | HxComponents Equivalent |
+| Vue 3 Concept | HxComponents Equivalent |
 |---------------|-------------------------|
-| `data()` | Struct fields with `form` tags |
+| `ref()`, `reactive()` | Struct fields with `form` tags |
 | `props` | Struct fields (passed via form data or initial state) |
 | `methods` | Struct methods (event handlers, helpers) |
-| `computed` | Struct methods called from templates |
+| `computed()` | Struct methods called from templates |
 | `@click`, `@input` | HTMX attributes (`hx-post`, `hx-vals`, `hxc-event`) |
 | `v-model` | Form inputs with `name` attribute + HTMX |
 | `emit()` | Server-side event handlers (`On{EventName}`) |
-| `beforeCreate`, `created` | `BeforeEvent()` hook |
-| `beforeUpdate`, `updated` | `AfterEvent()` hook |
-| `watch` | Event handlers that compare values |
+| `onMounted()` | `BeforeEvent()` hook with conditional logic |
+| `onUpdated()` | `AfterEvent()` hook |
+| `watch()`, `watchEffect()` | Event handlers that compare values |
+| `provide()`/`inject()` | Context values or service layer |
 
-## Example 1: Simple Counter
+## Example 1: Simple Counter (Composition API)
 
-### Vue 2 Component
+### Vue 3 Component (Composition API)
+
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const count = ref(0)
+
+// Computed value
+const doubled = computed(() => count.value * 2)
+
+const increment = () => count.value++
+const decrement = () => count.value--
+</script>
+
+<template>
+  <div class="counter">
+    <button @click="decrement">−</button>
+    <span>{{ count }}</span>
+    <button @click="increment">+</button>
+    <p>Double: {{ doubled }}</p>
+  </div>
+</template>
+```
+
+### Vue 3 Component (Options API)
 
 ```vue
 <template>
@@ -67,26 +93,26 @@ import (
 	"io"
 )
 
-// CounterComponent - equivalent to Vue's data() and methods
+// CounterComponent - equivalent to Vue's ref()/reactive() or data()
 type CounterComponent struct {
-	Count int `form:"count"` // data() property
+	Count int `form:"count"` // ref(0) or data() { return { count: 0 } }
 }
 
-// OnIncrement - equivalent to Vue's methods.increment
+// OnIncrement - equivalent to Vue's increment method
 // Called automatically when hxc-event=increment
 func (c *CounterComponent) OnIncrement() error {
 	c.Count++
 	return nil
 }
 
-// OnDecrement - equivalent to Vue's methods.decrement
+// OnDecrement - equivalent to Vue's decrement method
 // Called automatically when hxc-event=decrement
 func (c *CounterComponent) OnDecrement() error {
 	c.Count--
 	return nil
 }
 
-// Doubled - equivalent to Vue's computed.doubled
+// Doubled - equivalent to Vue's computed property
 // Called from template as needed
 func (c *CounterComponent) Doubled() int {
 	return c.Count * 2
@@ -135,11 +161,74 @@ templ Counter(data CounterComponent) {
 }
 ```
 
-## Example 2: Todo List with Props and Events
+## Example 2: Todo List with Lifecycle Hooks
 
-### Vue 2 Component
+### Vue 3 Component (Composition API)
 
 ```vue
+<script setup>
+import { ref, computed, onMounted, onUpdated } from 'vue'
+
+const props = defineProps({
+  title: {
+    type: String,
+    default: 'My Todos'
+  }
+})
+
+const emit = defineEmits(['itemAdded', 'itemToggled', 'itemDeleted', 'completedCleared'])
+
+const items = ref([])
+const newItemText = ref('')
+
+onMounted(() => {
+  console.log('TodoList mounted')
+  // Could load data from API here
+})
+
+onUpdated(() => {
+  console.log('TodoList updated', items.value.length)
+})
+
+const activeCount = computed(() =>
+  items.value.filter(i => !i.completed).length
+)
+
+const completedCount = computed(() =>
+  items.value.filter(i => i.completed).length
+)
+
+const addItem = () => {
+  if (!newItemText.value) return
+
+  items.value.push({
+    id: Date.now(),
+    text: newItemText.value,
+    completed: false
+  })
+  newItemText.value = ''
+  emit('itemAdded')
+}
+
+const toggleItem = (id) => {
+  const item = items.value.find(i => i.id === id)
+  if (item) {
+    item.completed = !item.completed
+    emit('itemToggled', id)
+  }
+}
+
+const deleteItem = (id) => {
+  items.value = items.value.filter(i => i.id !== id)
+  emit('itemDeleted', id)
+}
+
+const clearCompleted = () => {
+  items.value = items.value.filter(i => !i.completed)
+  emit('completedCleared')
+}
+</script>
+
 <template>
   <div class="todo-list">
     <h3>{{ title }}</h3>
@@ -165,66 +254,6 @@ templ Counter(data CounterComponent) {
     </button>
   </div>
 </template>
-
-<script>
-export default {
-  name: 'TodoList',
-  props: {
-    title: {
-      type: String,
-      default: 'My Todos'
-    }
-  },
-  data() {
-    return {
-      items: [],
-      newItemText: ''
-    }
-  },
-  computed: {
-    activeCount() {
-      return this.items.filter(i => !i.completed).length
-    },
-    completedCount() {
-      return this.items.filter(i => i.completed).length
-    }
-  },
-  methods: {
-    addItem() {
-      if (!this.newItemText) return
-
-      this.items.push({
-        id: Date.now(),
-        text: this.newItemText,
-        completed: false
-      })
-      this.newItemText = ''
-      this.$emit('item-added')
-    },
-    toggleItem(id) {
-      const item = this.items.find(i => i.id === id)
-      if (item) {
-        item.completed = !item.completed
-        this.$emit('item-toggled', id)
-      }
-    },
-    deleteItem(id) {
-      this.items = this.items.filter(i => i.id !== id)
-      this.$emit('item-deleted', id)
-    },
-    clearCompleted() {
-      this.items = this.items.filter(i => !i.completed)
-      this.$emit('completed-cleared')
-    }
-  },
-  created() {
-    console.log('TodoList created')
-  },
-  updated() {
-    console.log('TodoList updated')
-  }
-}
-</script>
 ```
 
 ### HxComponents Equivalent
@@ -246,12 +275,12 @@ type TodoItem struct {
 	Completed bool
 }
 
-// TodoListComponent - combines Vue's props, data, methods, and computed
+// TodoListComponent - combines Vue's props, ref/reactive, and methods
 type TodoListComponent struct {
-	// Props (could be set from initial state or parent component)
+	// Props (like Vue props)
 	Title string `json:"-"`
 
-	// Data
+	// Reactive state (like ref() or reactive())
 	Items       []TodoItem `json:"-"`
 	NewItemText string     `form:"newItemText"`
 	ItemID      int        `form:"itemId"`
@@ -261,32 +290,33 @@ type TodoListComponent struct {
 	EventCount int    `json:"-"`
 }
 
-// BeforeEvent - equivalent to Vue's beforeCreate/created hooks
+// BeforeEvent - equivalent to Vue's onMounted/onBeforeUpdate
 // Called before any event handler
-func (t *TodoListComponent) BeforeEvent(eventName string) error {
+func (t *TodoListComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList event starting", "event", eventName)
 
+	// This is like onMounted() or onBeforeUpdate()
 	// You could validate authentication here
 	// You could load data from database here
 
 	return nil
 }
 
-// AfterEvent - equivalent to Vue's beforeUpdate/updated hooks
+// AfterEvent - equivalent to Vue's onUpdated/onUnmounted
 // Called after successful event handler
-func (t *TodoListComponent) AfterEvent(eventName string) error {
-	slog.Info("TodoList event completed", "event", eventName)
+func (t *TodoListComponent) AfterEvent(ctx context.Context, eventName string) error {
+	slog.Info("TodoList event completed", "event", eventName, "itemCount", len(t.Items))
 
 	t.LastEvent = eventName
 	t.EventCount++
 
-	// Equivalent to Vue's this.$emit()
+	// Equivalent to Vue's emit()
 	// You could trigger webhooks, send notifications, etc.
 
 	return nil
 }
 
-// OnAddItem - equivalent to Vue's methods.addItem
+// OnAddItem - equivalent to Vue's addItem method
 // Automatically called when hxc-event=addItem
 func (t *TodoListComponent) OnAddItem() error {
 	if t.NewItemText == "" {
@@ -301,21 +331,21 @@ func (t *TodoListComponent) OnAddItem() error {
 		}
 	}
 
-	// Add the new item
+	// Add the new item (like items.value.push(...))
 	t.Items = append(t.Items, TodoItem{
 		ID:        newID,
 		Text:      t.NewItemText,
 		Completed: false,
 	})
 
-	// Clear the input (like Vue's this.newItemText = '')
+	// Clear the input (like newItemText.value = '')
 	t.NewItemText = ""
 
 	slog.Info("Added todo item", "id", newID)
 	return nil
 }
 
-// OnToggleItem - equivalent to Vue's methods.toggleItem
+// OnToggleItem - equivalent to Vue's toggleItem method
 func (t *TodoListComponent) OnToggleItem() error {
 	for i := range t.Items {
 		if t.Items[i].ID == t.ItemID {
@@ -327,7 +357,7 @@ func (t *TodoListComponent) OnToggleItem() error {
 	return fmt.Errorf("item with ID %d not found", t.ItemID)
 }
 
-// OnDeleteItem - equivalent to Vue's methods.deleteItem
+// OnDeleteItem - equivalent to Vue's deleteItem method
 func (t *TodoListComponent) OnDeleteItem() error {
 	for i, item := range t.Items {
 		if item.ID == t.ItemID {
@@ -339,7 +369,7 @@ func (t *TodoListComponent) OnDeleteItem() error {
 	return fmt.Errorf("item with ID %d not found", t.ItemID)
 }
 
-// OnClearCompleted - equivalent to Vue's methods.clearCompleted
+// OnClearCompleted - equivalent to Vue's clearCompleted method
 func (t *TodoListComponent) OnClearCompleted() error {
 	remaining := []TodoItem{}
 	removedCount := 0
@@ -357,7 +387,7 @@ func (t *TodoListComponent) OnClearCompleted() error {
 	return nil
 }
 
-// GetActiveCount - equivalent to Vue's computed.activeCount
+// GetActiveCount - equivalent to Vue's computed property
 func (t *TodoListComponent) GetActiveCount() int {
 	count := 0
 	for _, item := range t.Items {
@@ -368,7 +398,7 @@ func (t *TodoListComponent) GetActiveCount() int {
 	return count
 }
 
-// GetCompletedCount - equivalent to Vue's computed.completedCount
+// GetCompletedCount - equivalent to Vue's computed property
 func (t *TodoListComponent) GetCompletedCount() int {
 	count := 0
 	for _, item := range t.Items {
@@ -473,11 +503,60 @@ templ TodoList(data TodoListComponent) {
 }
 ```
 
-## Example 3: Form with Validation (Watchers)
+## Example 3: Form with Watchers (Composition API)
 
-### Vue 2 Component
+### Vue 3 Component (Composition API)
 
 ```vue
+<script setup>
+import { ref, computed, watch } from 'vue'
+
+const email = ref('')
+const password = ref('')
+const emailError = ref('')
+const passwordError = ref('')
+
+// Watch for changes
+watch(email, (newVal) => {
+  validateEmail(newVal)
+})
+
+watch(password, (newVal) => {
+  validatePassword(newVal)
+})
+
+const isValid = computed(() =>
+  !emailError.value && !passwordError.value &&
+  email.value && password.value
+)
+
+const validateEmail = (value) => {
+  if (!value) {
+    emailError.value = 'Email is required'
+  } else if (!value.includes('@')) {
+    emailError.value = 'Invalid email'
+  } else {
+    emailError.value = ''
+  }
+}
+
+const validatePassword = (value) => {
+  if (!value) {
+    passwordError.value = 'Password is required'
+  } else if (value.length < 8) {
+    passwordError.value = 'Password must be 8+ characters'
+  } else {
+    passwordError.value = ''
+  }
+}
+
+const submit = () => {
+  if (isValid.value) {
+    console.log('Submit', { email: email.value, password: password.value })
+  }
+}
+</script>
+
 <template>
   <div class="user-form">
     <input v-model="email" placeholder="Email">
@@ -489,58 +568,6 @@ templ TodoList(data TodoListComponent) {
     <button @click="submit" :disabled="!isValid">Submit</button>
   </div>
 </template>
-
-<script>
-export default {
-  data() {
-    return {
-      email: '',
-      password: '',
-      emailError: '',
-      passwordError: ''
-    }
-  },
-  computed: {
-    isValid() {
-      return !this.emailError && !this.passwordError &&
-             this.email && this.password
-    }
-  },
-  watch: {
-    email(newVal) {
-      this.validateEmail(newVal)
-    },
-    password(newVal) {
-      this.validatePassword(newVal)
-    }
-  },
-  methods: {
-    validateEmail(email) {
-      if (!email) {
-        this.emailError = 'Email is required'
-      } else if (!email.includes('@')) {
-        this.emailError = 'Invalid email'
-      } else {
-        this.emailError = ''
-      }
-    },
-    validatePassword(password) {
-      if (!password) {
-        this.passwordError = 'Password is required'
-      } else if (password.length < 8) {
-        this.passwordError = 'Password must be 8+ characters'
-      } else {
-        this.passwordError = ''
-      }
-    },
-    submit() {
-      if (this.isValid) {
-        this.$emit('submit', { email: this.email, password: this.password })
-      }
-    }
-  }
-}
-</script>
 ```
 
 ### HxComponents Equivalent
@@ -563,14 +590,15 @@ type UserFormComponent struct {
 	PasswordError string `json:"-"`
 }
 
-// BeforeEvent - validate on every interaction (like Vue watchers)
-func (f *UserFormComponent) BeforeEvent(eventName string) error {
+// BeforeEvent - equivalent to Vue's watch() for validation
+// This replaces watch() by running before every event
+func (f *UserFormComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	f.validateEmail()
 	f.validatePassword()
 	return nil
 }
 
-// OnSubmit - equivalent to Vue's methods.submit
+// OnSubmit - equivalent to Vue's submit method
 func (f *UserFormComponent) OnSubmit() error {
 	// Validation already done in BeforeEvent
 	if !f.IsValid() {
@@ -590,7 +618,7 @@ func (f *UserFormComponent) OnValidate() error {
 	return nil
 }
 
-// validateEmail - equivalent to Vue's methods.validateEmail
+// validateEmail - equivalent to Vue's validateEmail function
 func (f *UserFormComponent) validateEmail() {
 	if f.Email == "" {
 		f.EmailError = "Email is required"
@@ -601,7 +629,7 @@ func (f *UserFormComponent) validateEmail() {
 	}
 }
 
-// validatePassword - equivalent to Vue's methods.validatePassword
+// validatePassword - equivalent to Vue's validatePassword function
 func (f *UserFormComponent) validatePassword() {
 	if f.Password == "" {
 		f.PasswordError = "Password is required"
@@ -612,7 +640,7 @@ func (f *UserFormComponent) validatePassword() {
 	}
 }
 
-// IsValid - equivalent to Vue's computed.isValid
+// IsValid - equivalent to Vue's computed property
 func (f *UserFormComponent) IsValid() bool {
 	return f.EmailError == "" && f.PasswordError == "" &&
 		f.Email != "" && f.Password != ""
@@ -629,7 +657,7 @@ package userform
 
 templ UserForm(data UserFormComponent) {
 	<div class="user-form">
-		<!-- v-model with validation on input -->
+		<!-- v-model with validation on change -->
 		<input
 			type="email"
 			name="email"
@@ -682,31 +710,264 @@ templ UserForm(data UserFormComponent) {
 
 ## Key Migration Patterns
 
-### 1. Data Binding (v-model)
+### 1. Reactivity (ref/reactive)
 
-**Vue:**
+**Vue 3 Composition API:**
 ```vue
-<input v-model="username">
+<script setup>
+import { ref, reactive } from 'vue'
+
+const count = ref(0)
+const user = reactive({ name: 'John', age: 30 })
+
+count.value++
+user.name = 'Jane'
+</script>
+```
+
+**HxComponents:**
+```go
+type Component struct {
+	Count int  `form:"count"`
+	Name  string `form:"name"`
+	Age   int  `form:"age"`
+}
+
+func (c *Component) OnUpdate() error {
+	c.Count++
+	c.Name = "Jane"
+	return nil
+}
+```
+
+### 2. Props (defineProps)
+
+**Vue 3:**
+```vue
+<script setup>
+const props = defineProps({
+  title: String,
+  count: Number
+})
+</script>
+
+<template>
+  <h1>{{ props.title }}: {{ props.count }}</h1>
+</template>
+```
+
+**HxComponents:**
+```go
+type Component struct {
+	Title string `json:"-"`
+	Count int    `json:"-"`
+}
+```
+
+```templ
+templ Component(data Component) {
+	<h1>{ data.Title }: { fmt.Sprint(data.Count) }</h1>
+}
+```
+
+### 3. Emits (defineEmits)
+
+**Vue 3:**
+```vue
+<script setup>
+const emit = defineEmits(['update', 'delete'])
+
+const handleUpdate = () => {
+  emit('update', data)
+}
+</script>
+```
+
+**HxComponents:**
+```go
+// Emits are replaced by event handlers and lifecycle hooks
+func (c *Component) OnUpdate() error {
+	// Handle update
+	return nil
+}
+
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
+	// This is where you'd trigger side effects
+	// Like calling webhooks, sending notifications, etc.
+	return nil
+}
+```
+
+### 4. Computed Properties
+
+**Vue 3:**
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const firstName = ref('John')
+const lastName = ref('Doe')
+const fullName = computed(() => `${firstName.value} ${lastName.value}`)
+</script>
+```
+
+**HxComponents:**
+```go
+type Component struct {
+	FirstName string `form:"firstName"`
+	LastName  string `form:"lastName"`
+}
+
+func (c *Component) FullName() string {
+	return c.FirstName + " " + c.LastName
+}
+```
+
+```templ
+<p>{ data.FullName() }</p>
+```
+
+### 5. Watchers
+
+**Vue 3:**
+```vue
+<script setup>
+import { ref, watch } from 'vue'
+
+const count = ref(0)
+
+watch(count, (newVal, oldVal) => {
+  console.log('Count changed from', oldVal, 'to', newVal)
+})
+</script>
+```
+
+**HxComponents:**
+```go
+type Component struct {
+	Count    int `form:"count"`
+	OldCount int `json:"-"`
+}
+
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
+	c.OldCount = c.Count
+	return nil
+}
+
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
+	if c.Count != c.OldCount {
+		log.Printf("Count changed from %d to %d", c.OldCount, c.Count)
+	}
+	return nil
+}
+```
+
+### 6. Lifecycle Hooks
+
+**Vue 3:**
+```vue
+<script setup>
+import { onMounted, onUpdated, onUnmounted } from 'vue'
+
+onMounted(() => {
+  console.log('Component mounted')
+})
+
+onUpdated(() => {
+  console.log('Component updated')
+})
+
+onUnmounted(() => {
+  console.log('Component unmounted')
+})
+</script>
+```
+
+**HxComponents:**
+```go
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
+	// Like onMounted or onBeforeUpdate
+	log.Println("Event starting:", eventName)
+	return nil
+}
+
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
+	// Like onUpdated
+	log.Println("Event completed:", eventName)
+	return nil
+}
+
+// No direct equivalent to onUnmounted since components are stateless
+// Use context cancellation or cleanup in AfterEvent if needed
+```
+
+### 7. Provide/Inject
+
+**Vue 3:**
+```vue
+<!-- Parent -->
+<script setup>
+import { provide } from 'vue'
+
+provide('user', { name: 'John' })
+</script>
+
+<!-- Child -->
+<script setup>
+import { inject } from 'vue'
+
+const user = inject('user')
+</script>
+```
+
+**HxComponents:**
+```go
+// Use context.Context for passing data
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
+	// Get user from session, database, or context
+	user := getUserFromContext(c.ctx)
+	c.CurrentUser = user
+	return nil
+}
+```
+
+### 8. Conditional Rendering
+
+**Vue 3:**
+```vue
+<p v-if="show">Visible</p>
+<p v-else>Hidden</p>
 ```
 
 **HxComponents:**
 ```templ
-<input
-	name="username"
-	value={ data.Username }
-	hx-post="/component/form"
-	hx-trigger="change"
-	hx-include="closest form"
-	hx-target="closest form"
-	hx-swap="outerHTML"
-/>
+if data.Show {
+	<p>Visible</p>
+} else {
+	<p>Hidden</p>
+}
 ```
 
-### 2. Events (@click, @change)
+### 9. List Rendering
 
-**Vue:**
+**Vue 3:**
+```vue
+<li v-for="item in items" :key="item.id">{{ item.name }}</li>
+```
+
+**HxComponents:**
+```templ
+for _, item := range data.Items {
+	<li>{ item.Name }</li>
+}
+```
+
+### 10. Event Handling
+
+**Vue 3:**
 ```vue
 <button @click="handleClick">Click</button>
+<input @input="handleInput" v-model="text">
 ```
 
 **HxComponents:**
@@ -719,123 +980,41 @@ templ UserForm(data UserFormComponent) {
 >
 	Click
 </button>
+
+<input
+	name="text"
+	value={ data.Text }
+	hx-post="/component/mycomponent"
+	hx-trigger="input"
+	hx-vals='{"hxc-event": "handleInput"}'
+	hx-target="closest .container"
+	hx-swap="outerHTML"
+/>
 ```
 
-**Go method:**
-```go
-func (c *MyComponent) OnHandleClick() error {
-	// Handle click
-	return nil
-}
-```
-
-### 3. Conditional Rendering (v-if, v-show)
-
-**Vue:**
-```vue
-<p v-if="showMessage">{{ message }}</p>
-```
-
-**HxComponents:**
-```templ
-if data.ShowMessage {
-	<p>{ data.Message }</p>
-}
-```
-
-### 4. List Rendering (v-for)
-
-**Vue:**
-```vue
-<li v-for="item in items" :key="item.id">{{ item.name }}</li>
-```
-
-**HxComponents:**
-```templ
-for _, item := range data.Items {
-	<li>{ item.Name }</li>
-}
-```
-
-### 5. Computed Properties
-
-**Vue:**
-```js
-computed: {
-	fullName() {
-		return this.firstName + ' ' + this.lastName
-	}
-}
-```
-
-**HxComponents:**
-```go
-func (c *Component) FullName() string {
-	return c.FirstName + " " + c.LastName
-}
-```
-
-**Template:**
-```templ
-<p>{ data.FullName() }</p>
-```
-
-### 6. Lifecycle Hooks
-
-**Vue:**
-```js
-created() { },
-mounted() { },
-updated() { },
-destroyed() { }
-```
-
-**HxComponents:**
-```go
-func (c *Component) BeforeEvent(eventName string) error {
-	// Like created/beforeUpdate
-	return nil
-}
-
-func (c *Component) AfterEvent(eventName string) error {
-	// Like updated
-	return nil
-}
-
-func (c *Component) Process() error {
-	// Final processing before render
-	return nil
-}
-```
-
-## State Management
-
-In Vue, you might use Vuex for state. In HxComponents:
-
-1. **Component State**: Store in struct fields
-2. **Session State**: Use session storage or cookies
-3. **Database State**: Load in BeforeEvent, save in AfterEvent
-4. **Shared State**: Use a service layer or context values
-
-## Benefits of HxComponents over Vue
+## Benefits of HxComponents over Vue 3
 
 1. **Type Safety**: Go's type system catches errors at compile time
-2. **Performance**: Server-side rendering is faster for many use cases
-3. **SEO Friendly**: All content rendered on server
-4. **Simpler Deployment**: Single binary, no build step for frontend
-5. **Better Security**: Business logic stays on server
-6. **No JavaScript Required**: Progressive enhancement approach
+2. **Simpler Mental Model**: No reactivity system to understand
+3. **No Build Step**: No Vite/Webpack configuration needed
+4. **Performance**: Server-side rendering with minimal JavaScript
+5. **SEO Friendly**: All content rendered on server
+6. **Single Binary**: Easier deployment
+7. **Better Security**: Business logic stays on server
 
 ## When to Use Each
 
-**Use Vue/React/Angular when:**
-- You need rich client-side interactivity (real-time games, drawing apps)
+**Use Vue 3 when:**
+- You need rich client-side interactivity
 - You want offline-first capabilities
-- You have complex client-side state management needs
+- You need the Vue ecosystem (Vuetify, Nuxt, etc.)
+- Complex client-side state management is required
+- You prefer frontend-focused development
 
 **Use HxComponents when:**
 - You want simpler architecture
 - SEO is important
-- You prefer type safety
+- You prefer type safety and compile-time errors
 - You want to avoid JavaScript complexity
 - Server-side rendering fits your use case
+- You're already working in Go

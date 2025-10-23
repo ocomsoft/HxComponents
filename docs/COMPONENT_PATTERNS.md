@@ -40,7 +40,7 @@ type ProductComponent struct {
 ### Property Validation
 
 ```go
-func (p *ProductComponent) BeforeEvent(eventName string) error {
+func (p *ProductComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	// Validate required properties
 	if p.ProductID <= 0 {
 		return fmt.Errorf("product ID is required")
@@ -70,7 +70,7 @@ type SearchComponent struct {
 	SortOrder  string `form:"sortOrder"`
 }
 
-func (s *SearchComponent) BeforeEvent(eventName string) error {
+func (s *SearchComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	// Set defaults if not provided
 	if s.Page == 0 {
 		s.Page = 1
@@ -241,10 +241,17 @@ The complete event lifecycle is:
 7. **Render** - Generate HTML response
 
 ```go
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Called before every event
-	// Use for: validation, auth checks, loading data
+	// Use for: validation, auth checks, loading data from DB
 	slog.Info("event starting", "event", eventName)
+
+	// Example: Load data with context
+	data, err := db.LoadData(ctx, c.ID)
+	if err != nil {
+		return err
+	}
+	c.Data = data
 	return nil
 }
 
@@ -254,16 +261,18 @@ func (c *Component) On{EventName}() error {
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Called after successful event
-	// Use for: logging, analytics, cache invalidation
+	// Use for: logging, analytics, cache invalidation, saving to DB
 	slog.Info("event completed", "event", eventName)
-	return nil
+
+	// Example: Save to database with context
+	return db.SaveData(ctx, c.Data)
 }
 
-func (c *Component) Process() error {
+func (c *Component) Process(ctx context.Context) error {
 	// Called after event chain completes
-	// Use for: final data loading, permission checks
+	// Use for: final data loading, permission checks, API calls
 	return nil
 }
 ```
@@ -360,14 +369,14 @@ type ProductListComponent struct {
 	db         *sql.DB   `json:"-"`
 }
 
-func (p *ProductListComponent) Process() error {
+func (p *ProductListComponent) Process(ctx context.Context) error {
 	// Load products in Process, called before render
-	return p.loadProducts()
+	return p.loadProducts(ctx)
 }
 
-func (p *ProductListComponent) loadProducts() error {
+func (p *ProductListComponent) loadProducts(ctx context.Context) error {
 	var err error
-	p.Products, err = p.db.GetProductsByCategory(p.CategoryID)
+	p.Products, err = p.db.GetProductsByCategoryWithContext(ctx, p.CategoryID)
 	return err
 }
 

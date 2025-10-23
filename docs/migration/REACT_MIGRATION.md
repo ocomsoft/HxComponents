@@ -250,19 +250,20 @@ type TodoListComponent struct {
 
 // BeforeEvent - equivalent to React's useEffect(..., [])
 // Called before any event handler
-func (t *TodoListComponent) BeforeEvent(eventName string) error {
+func (t *TodoListComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList event starting", "event", eventName)
 
 	// This is like useEffect on mount
 	// You could validate authentication here
-	// You could load data from database here
+	// You could load data from database here using ctx
+	// Example: items, err := db.LoadTodos(ctx, t.UserID)
 
 	return nil
 }
 
 // AfterEvent - equivalent to React's useEffect(..., [items])
 // Called after successful event handler
-func (t *TodoListComponent) AfterEvent(eventName string) error {
+func (t *TodoListComponent) AfterEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList event completed", "event", eventName, "itemCount", len(t.Items))
 
 	t.LastEvent = eventName
@@ -582,7 +583,7 @@ type UserFormComponent struct {
 
 // BeforeEvent - equivalent to React's useEffect for validation
 // This replaces the custom hook pattern
-func (f *UserFormComponent) BeforeEvent(eventName string) error {
+func (f *UserFormComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	f.validateEmail()
 	f.validatePassword()
 	return nil
@@ -836,13 +837,13 @@ useEffect(() => {
 
 **HxComponents:**
 ```go
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Like useEffect on mount or before updates
 	log.Println("Event starting:", eventName)
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Like useEffect after updates
 	log.Println("Event completed:", eventName)
 	return nil
@@ -871,7 +872,7 @@ function Child() {
 **HxComponents:**
 ```go
 // Use context.Context or service layer
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Get user from session, database, or context
 	user := getUserFromSession()
 	c.CurrentUser = user

@@ -243,8 +243,8 @@ type HeaderComponent struct {
 	CartItems int
 }
 
-func (c *HeaderComponent) BeforeEvent(eventName string) error {
-	state := shared.GetSharedState(c.ctx)
+func (c *HeaderComponent) BeforeEvent(ctx context.Context, eventName string) error {
+	state := shared.GetSharedState(ctx)
 	c.UserID = state.UserID
 	c.Theme = state.Theme
 	c.CartItems = state.CartItems
@@ -282,8 +282,8 @@ type ProfileComponent struct {
 	User   *User  `json:"-"`
 }
 
-func (c *ProfileComponent) BeforeEvent(eventName string) error {
-	user, err := services.Users.GetUser(c.UserID)
+func (c *ProfileComponent) BeforeEvent(ctx context.Context, eventName string) error {
+	user, err := services.Users.GetUserWithContext(ctx, c.UserID)
 	if err != nil {
 		return err
 	}
@@ -309,8 +309,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 }
 
 // In component
-func (c *Component) BeforeEvent(eventName string) error {
-	user := c.ctx.Value("user").(*User)
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
+	user := ctx.Value("user").(*User)
 	c.CurrentUser = user
 	return nil
 }

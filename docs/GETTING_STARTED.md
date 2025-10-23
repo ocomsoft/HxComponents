@@ -146,10 +146,10 @@ comp := &counter.CounterComponent{Count: 10}
 3. Registry creates a new instance of the component
 4. Registry parses form data into component fields (using `form` tags)
 5. Registry calls lifecycle hooks in order:
-   - `BeforeEvent(eventName)` if implemented
+   - `BeforeEvent(ctx, eventName)` if implemented
    - `On{EventName}()` method if hxc-event parameter is present
-   - `AfterEvent(eventName)` if implemented
-   - `Process()` if implemented
+   - `AfterEvent(ctx, eventName)` if implemented
+   - `Process(ctx)` if implemented
 6. Component is rendered using its `Render()` method
 7. HTML is returned to the client
 8. HTMX swaps the content based on `hx-target` and `hx-swap` attributes
@@ -162,25 +162,28 @@ Request → Parse Form Data → BeforeEvent → On{EventName} → AfterEvent →
 
 ### Lifecycle Hooks
 
-**BeforeEvent(eventName string) error**
+**BeforeEvent(ctx context.Context, eventName string) error**
 - Called before any event handler
 - Use for authentication, loading data from database/session
 - Return error to abort the request
+- Context provides request-scoped values and cancellation
 
 **On{EventName}() error**
 - Event handler method (e.g., `OnSubmit`, `OnAddItem`)
 - Called when `hxc-event` parameter matches the event name
 - Return error to indicate failure
 
-**AfterEvent(eventName string) error**
+**AfterEvent(ctx context.Context, eventName string) error**
 - Called after successful event handler
 - Use for saving data, triggering webhooks, notifications
 - Return error to indicate failure
+- Context provides request-scoped values and cancellation
 
-**Process() error**
+**Process(ctx context.Context) error**
 - Called after all events, before rendering
 - Use for final data transformations
 - Return error to indicate failure
+- Context provides request-scoped values and cancellation
 
 ## Development Workflow
 

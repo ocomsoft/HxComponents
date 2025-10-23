@@ -407,7 +407,7 @@ type TodoListComponent struct {
 
 // BeforeEvent - equivalent to Svelte's onMount/beforeUpdate
 // Called before any event handler
-func (t *TodoListComponent) BeforeEvent(eventName string) error {
+func (t *TodoListComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList event starting", "event", eventName)
 
 	// This is like onMount() or beforeUpdate()
@@ -419,7 +419,7 @@ func (t *TodoListComponent) BeforeEvent(eventName string) error {
 
 // AfterEvent - equivalent to Svelte's afterUpdate
 // Called after successful event handler
-func (t *TodoListComponent) AfterEvent(eventName string) error {
+func (t *TodoListComponent) AfterEvent(ctx context.Context, eventName string) error {
 	slog.Info("TodoList event completed", "event", eventName, "itemCount", len(t.Items))
 
 	t.LastEvent = eventName
@@ -697,7 +697,7 @@ type UserFormComponent struct {
 
 // BeforeEvent - equivalent to Svelte's $: reactive blocks
 // This replaces reactive statements by running before every event
-func (f *UserFormComponent) BeforeEvent(eventName string) error {
+func (f *UserFormComponent) BeforeEvent(ctx context.Context, eventName string) error {
 	f.validateEmail()
 	f.validatePassword()
 	return nil
@@ -1007,7 +1007,7 @@ func (c *Component) OnClick() error {
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// This is where you'd trigger side effects
 	// Like calling webhooks, sending notifications, etc.
 	log.Println("Event dispatched:", eventName)
@@ -1038,13 +1038,13 @@ func (c *Component) AfterEvent(eventName string) error {
 
 **HxComponents:**
 ```go
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Like onMount or beforeUpdate
 	log.Println("Event starting:", eventName)
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Like afterUpdate
 	log.Println("Event completed:", eventName)
 	return nil
@@ -1078,14 +1078,14 @@ type SessionStore struct {
 	Count int
 }
 
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Load from session or database
 	session := getSession()
 	c.Count = session.Count
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Save to session or database
 	saveToSession(c.Count)
 	return nil
@@ -1142,7 +1142,7 @@ func (c *Component) AfterEvent(eventName string) error {
 **HxComponents:**
 ```go
 // Use context.Context for passing data
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Get user from session, database, or context
 	user := getUserFromContext(c.ctx)
 	c.CurrentUser = user

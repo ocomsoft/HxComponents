@@ -11,10 +11,10 @@ HxComponents is a Go-based component framework that uses HTMX for interactivity 
 ### 1. Choose Your Path
 
 **Migrating from another framework?**
-- [React Migration Guide](REACT_MIGRATION.md) - Coming from React
-- [Vue 3 Migration Guide](VUE3_MIGRATION.md) - Coming from Vue 3
-- [Vue 2 Migration Guide](VUE_MIGRATION.md) - Coming from Vue 2
-- [Svelte Migration Guide](SVELTE_MIGRATION.md) - Coming from Svelte
+- [React Migration Guide](migration/REACT_MIGRATION.md) - Coming from React
+- [Vue 3 Migration Guide](migration/VUE3_MIGRATION.md) - Coming from Vue 3
+- [Vue 2 Migration Guide](migration/VUE_MIGRATION.md) - Coming from Vue 2
+- [Svelte Migration Guide](migration/SVELTE_MIGRATION.md) - Coming from Svelte
 
 **Starting fresh?**
 - [Getting Started](GETTING_STARTED.md) - Setup and first component
@@ -44,25 +44,28 @@ Request → Parse Form Data → BeforeEvent → On{EventName} → AfterEvent →
 
 ### Lifecycle Hooks
 
-**BeforeEvent(eventName string) error**
+**BeforeEvent(ctx context.Context, eventName string) error**
 - Called before any event handler
 - Use for loading data, authentication
 - Return error to abort request
+- Context provides request-scoped values and cancellation
 
 **On{EventName}() error**
 - Event handler (e.g., `OnSubmit`, `OnAddItem`)
 - Called when `hxc-event` parameter matches
 - Return error to indicate failure
 
-**AfterEvent(eventName string) error**
+**AfterEvent(ctx context.Context, eventName string) error**
 - Called after successful event handler
 - Use for saving data, side effects
 - Return error to indicate failure
+- Context provides request-scoped values and cancellation
 
-**Process() error**
+**Process(ctx context.Context) error**
 - Called after all events, before render
 - Use for final transformations
 - Return error to indicate failure
+- Context provides request-scoped values and cancellation
 
 ## State Management
 
@@ -77,13 +80,13 @@ Best for: Simple state that doesn't need persistence
 ### Option 2: Session Storage
 Best for: User-specific state during a session
 ```go
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Load from session
 	c.Data = getFromSession("data")
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Save to session
 	saveToSession("data", c.Data)
 	return nil
@@ -93,15 +96,15 @@ func (c *Component) AfterEvent(eventName string) error {
 ### Option 3: Database
 Best for: Persistent state that survives sessions
 ```go
-func (c *Component) BeforeEvent(eventName string) error {
+func (c *Component) BeforeEvent(ctx context.Context, eventName string) error {
 	// Load from database
-	c.Items = db.GetItems(c.UserID)
+	c.Items = db.GetItems(ctx, c.UserID)
 	return nil
 }
 
-func (c *Component) AfterEvent(eventName string) error {
+func (c *Component) AfterEvent(ctx context.Context, eventName string) error {
 	// Save to database
-	return db.SaveItems(c.UserID, c.Items)
+	return db.SaveItems(ctx, c.UserID, c.Items)
 }
 ```
 

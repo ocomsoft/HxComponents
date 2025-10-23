@@ -182,7 +182,8 @@ func TestComponentLifecycle(t *testing.T) {
 	}
 
 	// Test BeforeEvent
-	err := c.BeforeEvent("addItem")
+	ctx := context.Background()
+	err := c.BeforeEvent(ctx, "addItem")
 	assert.NoError(t, err)
 
 	// Test event handler
@@ -193,7 +194,7 @@ func TestComponentLifecycle(t *testing.T) {
 	assert.Equal(t, "", c.NewItemText) // Should be cleared
 
 	// Test AfterEvent
-	err = c.AfterEvent("addItem")
+	err = c.AfterEvent(ctx, "addItem")
 	assert.NoError(t, err)
 	assert.Equal(t, "addItem", c.LastEvent)
 	assert.Equal(t, 1, c.EventCount)
@@ -210,7 +211,8 @@ func TestValidationErrors(t *testing.T) {
 	}
 
 	// Trigger validation
-	err := form.BeforeEvent("submit")
+	ctx := context.Background()
+	err := form.BeforeEvent(ctx, "submit")
 	assert.NoError(t, err) // BeforeEvent shouldn't error
 
 	// Check validation errors were set
@@ -225,7 +227,7 @@ func TestValidationErrors(t *testing.T) {
 	// Fix validation
 	form.Email = "test@example.com"
 	form.Password = "password123"
-	err = form.BeforeEvent("submit")
+	err = form.BeforeEvent(ctx, "submit")
 	assert.NoError(t, err)
 	assert.Empty(t, form.EmailError)
 	assert.Empty(t, form.PasswordError)
