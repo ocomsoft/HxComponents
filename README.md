@@ -20,6 +20,25 @@ The HTMX Generic Component Registry eliminates repetitive handler code by provid
 - ✅ **Framework agnostic** - Works with chi, gorilla/mux, net/http
 - ✅ **Composable** - Mix and match header interfaces as needed
 - ✅ **Dual-use components** - Same component works for HTMX requests AND server-side rendering
+- ✅ **Context-aware** - Full context.Context support for database queries and cancellation
+- ✅ **Debug mode** - Built-in debugging headers for development
+- ✅ **Thread-safe** - Safe for concurrent use
+
+## Documentation
+
+- 📖 **[API Reference (pkg.go.dev)](https://pkg.go.dev/github.com/ocomsoft/HxComponents)** - Complete API documentation
+- 📚 **[Documentation](docs/README.md)** - Comprehensive guides and tutorials
+- 🔍 **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Step-by-step solutions to common problems
+- 🐛 **[Common Gotchas](docs/COMMON_GOTCHAS.md)** - Known issues and workarounds
+- 🧪 **[Testing Guide](docs/TESTING.md)** - Testing strategies and examples
+- 🎯 **[Migration Guides](docs/)** - Migrate from React, Vue, or Svelte
+
+### Quick Links
+
+- [Getting Started](docs/GETTING_STARTED.md)
+- [Component Patterns](docs/COMPONENT_PATTERNS.md)
+- [Advanced Patterns](docs/ADVANCED_PATTERNS.md)
+- [Component Composition](docs/COMPONENT_COMPOSITION.md)
 
 ## Why Package-Level Register Function?
 
