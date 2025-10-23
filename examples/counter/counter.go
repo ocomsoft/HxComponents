@@ -6,19 +6,23 @@ import (
 )
 
 // CounterComponent represents a simple counter that can increment/decrement.
+// It demonstrates the event-driven pattern using hxc-event parameter.
 type CounterComponent struct {
-	Count  int    `form:"count"`
-	Action string `form:"action"` // "increment" or "decrement"
+	Count int `form:"count"`
+	// Note: No Action field needed - we use hxc-event param and event handler methods
 }
 
-// Process implements the Processor interface to handle counter logic.
-func (c *CounterComponent) Process() error {
-	switch c.Action {
-	case "increment":
-		c.Count++
-	case "decrement":
-		c.Count--
-	}
+// OnIncrement is an event handler that increments the counter.
+// This method is called automatically when hxc-event=increment is received.
+func (c *CounterComponent) OnIncrement() error {
+	c.Count++
+	return nil
+}
+
+// OnDecrement is an event handler that decrements the counter.
+// This method is called automatically when hxc-event=decrement is received.
+func (c *CounterComponent) OnDecrement() error {
+	c.Count--
 	return nil
 }
 

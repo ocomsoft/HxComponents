@@ -158,6 +158,19 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		// Apply request headers
 		applyHxHeaders(instance.Interface(), req)
 
+		// Handle event-driven processing if hxc-event parameter is present
+		if eventNames, ok := formData["hxc-event"]; ok && len(eventNames) > 0 {
+			eventName := eventNames[0]
+			if err := r.handleEvent(instance.Interface(), eventName, componentName); err != nil {
+				slog.Error("event handler error",
+					"component", componentName,
+					"event", eventName,
+					"error", err)
+				r.renderError(w, req, "Event Error", fmt.Sprintf("Event '%s' failed: %v", eventName, err), http.StatusInternalServerError)
+				return
+			}
+		}
+
 		// Call Process if the component implements the Processor interface
 		if processor, ok := instance.Interface().(Processor); ok {
 			if err := processor.Process(); err != nil {
@@ -193,6 +206,75 @@ func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
 		slog.Debug("component rendered successfully",
 			"component", componentName)
 	}
+}
+
+// handleEvent processes event-driven method calls on a component.
+// It implements the lifecycle: BeforeEvent → On{EventName} → AfterEvent
+// Returns an error if any step fails, stopping further processing.
+func (r *Registry) handleEvent(instance interface{}, eventName, componentName string) error {
+	// Call BeforeEvent hook if component implements it
+	if beforeHandler, ok := instance.(BeforeEventHandler); ok {
+		slog.Debug("calling BeforeEvent hook",
+			"component", componentName,
+			"event", eventName)
+		if err := beforeHandler.BeforeEvent(eventName); err != nil {
+			return fmt.Errorf("BeforeEvent failed: %w", err)
+		}
+	}
+
+	// Find and call the event handler method: On{EventName}
+	// Convert event name to method name (e.g., "increment" -> "OnIncrement")
+	methodName := "On" + capitalize(eventName)
+
+	value := reflect.ValueOf(instance)
+	method := value.MethodByName(methodName)
+
+	if !method.IsValid() {
+		return fmt.Errorf("event handler method '%s' not found", methodName)
+	}
+
+	// Call the event handler method
+	slog.Debug("calling event handler",
+		"component", componentName,
+		"event", eventName,
+		"method", methodName)
+
+	results := method.Call(nil)
+
+	// Check if method returns an error
+	if len(results) > 0 {
+		if err, ok := results[0].Interface().(error); ok && err != nil {
+			return fmt.Errorf("event handler failed: %w", err)
+		}
+	}
+
+	// Call AfterEvent hook if component implements it
+	if afterHandler, ok := instance.(AfterEventHandler); ok {
+		slog.Debug("calling AfterEvent hook",
+			"component", componentName,
+			"event", eventName)
+		if err := afterHandler.AfterEvent(eventName); err != nil {
+			return fmt.Errorf("AfterEvent failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// capitalize converts the first character of a string to uppercase.
+// Used to convert event names to method names (e.g., "increment" -> "OnIncrement").
+func capitalize(s string) string {
+	if s == "" {
+		return ""
+	}
+	runes := []rune(s)
+	runes[0] = rune(s[0] - 32) // Convert first char to uppercase
+	// Only capitalize if it was lowercase
+	if runes[0] >= 'A' && runes[0] <= 'Z' {
+		return string(runes)
+	}
+	// Return original if first char wasn't lowercase
+	return s
 }
 
 // Handler extracts the component name from the URL path and renders the component.

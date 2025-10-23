@@ -190,11 +190,11 @@ func TestCounterComponent(t *testing.T) {
 			HasText: "+",
 		})
 
-		// Check that button has hx-vals attribute
+		// Check that button has hx-vals attribute with new hxc-event parameter
 		hxVals, err := incrementBtn.GetAttribute("hx-vals")
 		require.NoError(t, err)
 		assert.Contains(t, hxVals, "count")
-		assert.Contains(t, hxVals, "action")
+		assert.Contains(t, hxVals, "hxc-event")
 		assert.Contains(t, hxVals, "increment")
 
 		// Check that button posts to /component/counter
