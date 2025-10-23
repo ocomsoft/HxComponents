@@ -1,0 +1,337 @@
+# HTMX Generic Component Registry - LLM Context
+
+## Project Overview
+
+HxComponents is a type-safe, framework-agnostic Go library for building dynamic HTMX components with minimal boilerplate. It uses Go 1.23+ generics to provide compile-time type safety and automatic form parsing.
+
+## Core Architecture
+
+### Component Registry Pattern
+
+The library provides a centralized registry that:
+1. Stores component type information and render functions
+2. Handles HTTP requests (GET and POST)
+3. Automatically parses form data into typed structs
+4. Manages HTMX request/response headers via optional interfaces
+5. Renders components using templ templates
+
+### Key Design Decisions
+
+1. **Framework-Agnostic**: Uses `http.HandlerFunc` to work with any Go router
+2. **Generic-Based**: Type-safe component registration using Go generics
+3. **Interface-Driven**: Optional HTMX headers via interface implementation
+4. **Zero Configuration**: Sensible defaults with customization options
+
+## File Structure
+
+```
+/components/
+  registry.go           - Core registry implementation
+  processor.go          - Processor interface for business logic
+  request_headers.go    - HTMX request header interfaces
+  response_headers.go   - HTMX response header interfaces
+  headers.go            - Header application logic
+  error.templ           - Default error template
+  registry_test.go      - Comprehensive tests
+
+/examples/
+  main.go               - Example application
+  ROUTER_EXAMPLES.md    - Router integration examples
+  /search/              - Search component example
+  /login/               - Login component example
+  /profile/             - Profile component example
+  /pages/               - Page templates
+```
+
+## Core Components
+
+### 1. Registry (`components/registry.go`)
+
+**Key Types:**
+```go
+type Registry struct {
+    components   map[string]componentEntry
+    errorHandler ErrorHandler
+}
+
+type componentEntry struct {
+    structType reflect.Type
+    render     func(interface{}) templ.Component
+}
+
+type ErrorHandler func(w http.ResponseWriter, req *http.Request, title string, message string, code int)
+```
+
+**Key Methods:**
+- `NewRegistry()` - Creates new registry with default error handler
+- `Register[T any](registry, name, renderFunc)` - Registers a component
+- `Handler(w, req)` - Extracts component name from URL and renders (wildcard routing)
+- `HandlerFor(componentName)` - Returns http.HandlerFunc for specific component
+- `SetErrorHandler(handler)` - Customizes error rendering
+
+### 2. Processor Interface (`components/processor.go`)
+
+```go
+type Processor interface {
+    Process() error
+}
+```
+
+Components implement this to run business logic after form decoding but before rendering.
+
+**Use cases:**
+- Form validation
+- Authentication/authorization
+- Database operations
+- Setting conditional response headers
+
+### 3. HTMX Request Headers (`components/request_headers.go`)
+
+Optional interfaces components can implement to capture HTMX request headers:
+
+```go
+type HxBoosted interface { SetHxBoosted(bool) }
+type HxRequest interface { SetHxRequest(bool) }
+type HxCurrentURL interface { SetHxCurrentURL(string) }
+type HxPrompt interface { SetHxPrompt(string) }
+type HxTarget interface { SetHxTarget(string) }
+type HxTrigger interface { SetHxTrigger(string) }
+type HxTriggerName interface { SetHxTriggerName(string) }
+type HttpMethod interface { SetHttpMethod(string) }
+```
+
+### 4. HTMX Response Headers (`components/response_headers.go`)
+
+Optional interfaces components can implement to set HTMX response headers:
+
+```go
+type HxLocationResponse interface { GetHxLocation() string }
+type HxPushUrlResponse interface { GetHxPushUrl() string }
+type HxRedirectResponse interface { GetHxRedirect() string }
+type HxRefreshResponse interface { GetHxRefresh() bool }
+type HxReplaceUrlResponse interface { GetHxReplaceUrl() string }
+type HxReswapResponse interface { GetHxReswap() string }
+type HxRetargetResponse interface { GetHxRetarget() string }
+type HxReselectResponse interface { GetHxReselect() string }
+type HxTriggerResponse interface { GetHxTrigger() string }
+type HxTriggerAfterSettleResponse interface { GetHxTriggerAfterSettle() string }
+type HxTriggerAfterSwapResponse interface { GetHxTriggerAfterSwap() string }
+```
+
+## Request Flow
+
+```
+1. HTTP Request (GET or POST) arrives
+2. Registry.HandlerFor(componentName) handler is invoked
+3. Check HTTP method (only GET and POST allowed)
+4. Look up component in registry
+5. Parse form data (POST: req.PostForm, GET: req.Form)
+6. Create instance of component struct
+7. Decode form data into struct using go-playground/form
+8. Apply HTMX request headers (if interfaces implemented)
+9. Call Process() method (if Processor interface implemented)
+10. Apply HTMX response headers (if interfaces implemented)
+11. Render component using templ
+12. Return HTML response
+```
+
+## Example Component
+
+```go
+// Component struct with form tags
+type LoginComponent struct {
+    Username   string `form:"username"`
+    Password   string `form:"password"`
+    RedirectTo string `json:"-"`
+    Error      string `json:"-"`
+}
+
+// Implement Processor interface
+func (c *LoginComponent) Process() error {
+    if c.Username == "demo" && c.Password == "password" {
+        c.RedirectTo = "/dashboard"
+        return nil
+    }
+    c.Error = "Invalid credentials"
+    return nil
+}
+
+// Implement response header interface
+func (c *LoginComponent) GetHxRedirect() string {
+    return c.RedirectTo
+}
+
+// Templ template (in login.templ)
+templ Login(data LoginComponent) {
+    if data.Error != "" {
+        <div class="error">{data.Error}</div>
+    }
+    <form hx-post="/login">
+        <input type="text" name="username" />
+        <input type="password" name="password" />
+        <button>Login</button>
+    </form>
+}
+```
+
+## Router Integration
+
+### chi Router (Wildcard Pattern - Recommended)
+```go
+router.Get("/component/*", registry.Handler)
+router.Post("/component/*", registry.Handler)
+```
+The `Handler` method extracts component name from URL path. Example: `/component/login` → component name: `login`
+
+### chi Router (Specific URLs)
+```go
+router.Get("/login", registry.HandlerFor("login"))
+router.Post("/login", registry.HandlerFor("login"))
+```
+
+### gorilla/mux (Wildcard Pattern)
+```go
+router.PathPrefix("/component/").HandlerFunc(registry.Handler).Methods("GET", "POST")
+```
+
+### gorilla/mux (Specific URLs)
+```go
+router.HandleFunc("/login", registry.HandlerFor("login")).Methods("GET", "POST")
+```
+
+### net/http (Wildcard Pattern)
+```go
+http.HandleFunc("/component/", registry.Handler)
+```
+
+### net/http (Specific URLs)
+```go
+http.HandleFunc("/login", registry.HandlerFor("login"))
+```
+
+## Testing Strategy
+
+The test suite covers:
+1. Basic component registration and rendering
+2. Form data parsing (simple and array fields)
+3. GET vs POST request handling
+4. Processor interface execution
+5. HTMX redirect headers
+6. Error handling
+
+## Dependencies
+
+- `github.com/a-h/templ` - Type-safe Go templating
+- `github.com/go-playground/form/v4` - Form decoding
+- `log/slog` - Structured logging
+
+**No router dependency** - Works with any Go HTTP router (chi, gorilla/mux, standard library, etc.)
+
+## Key Design Patterns
+
+1. **Generic Registration**: `Register[T any](registry, name, renderFunc)` maintains type safety
+2. **Interface Segregation**: Small, focused interfaces for optional features
+3. **Dependency Injection**: ErrorHandler can be customized
+4. **Reflection**: Used internally for type-safe form decoding
+5. **Template Method**: Process() hook allows custom logic insertion
+
+## Common Patterns
+
+### Login with Redirect
+```go
+type LoginComponent struct {
+    Username   string
+    RedirectTo string
+}
+
+func (c *LoginComponent) Process() error {
+    if authenticate(c.Username) {
+        c.RedirectTo = "/dashboard"
+    }
+    return nil
+}
+
+func (c *LoginComponent) GetHxRedirect() string {
+    return c.RedirectTo
+}
+```
+
+### Form Validation
+```go
+type FormComponent struct {
+    Email string
+    Error string
+}
+
+func (c *FormComponent) Process() error {
+    if !isValidEmail(c.Email) {
+        c.Error = "Invalid email"
+    }
+    return nil
+}
+```
+
+### GET vs POST Behavior
+```go
+type SearchComponent struct {
+    Query  string
+    Method string
+}
+
+func (c *SearchComponent) SetHttpMethod(m string) {
+    c.Method = m
+}
+
+func (c *SearchComponent) Process() error {
+    if c.Method == "GET" {
+        // Load default results
+    } else {
+        // Process search query
+    }
+    return nil
+}
+```
+
+## Error Handling
+
+1. **Default Handler**: Uses `ErrorComponent` templ template
+2. **Custom Handler**: Set via `SetErrorHandler()`
+3. **Error Types**:
+   - Method Not Allowed (405)
+   - Component Not Found (404)
+   - Form Parse Error (400)
+   - Form Decode Error (400)
+   - Process Error (500)
+   - Render Error (500)
+
+## Logging
+
+Uses `log/slog` with structured logging:
+- **Debug**: Component rendering lifecycle
+- **Warn**: Method not allowed, component not found
+- **Error**: Parse/decode/process/render errors
+
+## Best Practices
+
+1. **Use json:"-" tag** for internal fields that shouldn't be serialized
+2. **Implement Process()** for business logic instead of render function
+3. **Return nil from Process()** for validation errors (store in struct field)
+4. **Return error from Process()** only for unexpected failures
+5. **Use HandlerFor()** for framework-agnostic code
+6. **Use Mount()** for rapid chi prototyping
+7. **Register GET and POST** for best HTMX compatibility
+
+## Limitations
+
+1. Only GET and POST methods supported
+2. Mount() method requires chi router
+3. Uses reflection internally (slight performance overhead)
+4. Form decoder doesn't support nested structs by default
+
+## Future Enhancements (Not Implemented)
+
+- Middleware support
+- Component lifecycle hooks
+- Built-in validation helpers
+- WebSocket support
+- Server-sent events

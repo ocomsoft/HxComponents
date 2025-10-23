@@ -7,7 +7,6 @@ import (
 	"reflect"
 
 	"github.com/a-h/templ"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/form/v4"
 )
 
@@ -75,110 +74,159 @@ func Register[T any](r *Registry, name string, render func(T) templ.Component) {
 	}
 }
 
-// Handler handles GET and POST requests for component rendering.
-// For POST requests:
-//   - The component name is expected as a URL parameter "component_name"
-//   - Form data is parsed and bound to the registered component type
-//   - HTMX request headers are applied if the component implements the appropriate interfaces
-//   - HTMX response headers are set if the component implements the appropriate interfaces
+// HandlerFor returns an http.HandlerFunc for rendering a specific component.
+// This allows you to mount components at any URL path using any router.
 //
-// For GET requests:
-//   - The component name is expected as a URL parameter "component_name"
-//   - Query parameters are parsed and bound to the registered component type
-//   - HTMX request headers are applied if the component implements the appropriate interfaces
-//   - HTMX response headers are set if the component implements the appropriate interfaces
-//   - Useful for rendering components with default/initial state
-func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost && req.Method != http.MethodGet {
-		slog.Warn("method not allowed",
-			"method", req.Method,
-			"path", req.URL.Path)
-		r.renderError(w, req, "Method Not Allowed", fmt.Sprintf("Method %s is not allowed", req.Method), http.StatusMethodNotAllowed)
-		return
-	}
+// Example with net/http:
+//
+//	http.HandleFunc("/search", registry.HandlerFor("search"))
+//
+// Example with chi:
+//
+//	router.Get("/search", registry.HandlerFor("search"))
+//	router.Post("/search", registry.HandlerFor("search"))
+//
+// Example with gorilla/mux:
+//
+//	router.HandleFunc("/search", registry.HandlerFor("search"))
+func (r *Registry) HandlerFor(componentName string) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost && req.Method != http.MethodGet {
+			slog.Warn("method not allowed",
+				"method", req.Method,
+				"path", req.URL.Path,
+				"component", componentName)
+			r.renderError(w, req, "Method Not Allowed", fmt.Sprintf("Method %s is not allowed", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
 
-	componentName := chi.URLParam(req, "component_name")
-	entry, exists := r.components[componentName]
-	if !exists {
-		slog.Warn("component not found",
+		entry, exists := r.components[componentName]
+		if !exists {
+			slog.Warn("component not found",
+				"component", componentName,
+				"path", req.URL.Path)
+			r.renderError(w, req, "Component Not Found", fmt.Sprintf("Component '%s' not found", componentName), http.StatusNotFound)
+			return
+		}
+
+		slog.Debug("rendering component",
 			"component", componentName,
-			"path", req.URL.Path)
-		r.renderError(w, req, "Component Not Found", fmt.Sprintf("Component '%s' not found", componentName), http.StatusNotFound)
-		return
-	}
+			"method", req.Method)
 
-	slog.Debug("rendering component",
-		"component", componentName,
-		"method", req.Method)
-
-	if err := req.ParseForm(); err != nil {
-		slog.Error("form parse error",
-			"component", componentName,
-			"error", err)
-		r.renderError(w, req, "Bad Request", fmt.Sprintf("Failed to parse form data: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	// Create instance and decode form
-	instance := reflect.New(entry.structType)
-
-	// For POST, use PostForm; for GET, use Form (which includes query params)
-	var formData map[string][]string
-	if req.Method == http.MethodPost {
-		formData = req.PostForm
-	} else {
-		formData = req.Form
-	}
-
-	if err := decoder.Decode(instance.Interface(), formData); err != nil {
-		slog.Error("form decode error",
-			"component", componentName,
-			"error", err)
-		r.renderError(w, req, "Decode Error", fmt.Sprintf("Failed to decode form data: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	// Apply request headers
-	applyHxHeaders(instance.Interface(), req)
-
-	// Call Process if the component implements the Processor interface
-	if processor, ok := instance.Interface().(Processor); ok {
-		if err := processor.Process(); err != nil {
-			slog.Error("component process error",
+		if err := req.ParseForm(); err != nil {
+			slog.Error("form parse error",
 				"component", componentName,
 				"error", err)
-			r.renderError(w, req, "Processing Error", fmt.Sprintf("Component processing failed: %v", err), http.StatusInternalServerError)
+			r.renderError(w, req, "Bad Request", fmt.Sprintf("Failed to parse form data: %v", err), http.StatusBadRequest)
 			return
+		}
+
+		// Create instance and decode form
+		instance := reflect.New(entry.structType)
+
+		// For POST, use PostForm; for GET, use Form (which includes query params)
+		var formData map[string][]string
+		if req.Method == http.MethodPost {
+			formData = req.PostForm
+		} else {
+			formData = req.Form
+		}
+
+		if err := decoder.Decode(instance.Interface(), formData); err != nil {
+			slog.Error("form decode error",
+				"component", componentName,
+				"error", err)
+			r.renderError(w, req, "Decode Error", fmt.Sprintf("Failed to decode form data: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Apply request headers
+		applyHxHeaders(instance.Interface(), req)
+
+		// Call Process if the component implements the Processor interface
+		if processor, ok := instance.Interface().(Processor); ok {
+			if err := processor.Process(); err != nil {
+				slog.Error("component process error",
+					"component", componentName,
+					"error", err)
+				r.renderError(w, req, "Processing Error", fmt.Sprintf("Component processing failed: %v", err), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Apply response headers (after processing, so we capture any changes made during Process)
+		applyHxResponseHeaders(w, instance.Interface())
+
+		// Render component
+		w.Header().Set("Content-Type", "text/html")
+		component := entry.render(instance.Interface())
+		if err := component.Render(req.Context(), w); err != nil {
+			slog.Error("component render error",
+				"component", componentName,
+				"error", err)
+			r.renderError(w, req, "Render Error", fmt.Sprintf("Component rendering failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		slog.Debug("component rendered successfully",
+			"component", componentName)
+	}
+}
+
+// Handler extracts the component name from the URL path and renders the component.
+// The component name is extracted from the last segment of the URL path after the last slash.
+// This allows for wildcard routing patterns.
+//
+// Example with chi:
+//
+//	router.Get("/component/*", registry.Handler)
+//	router.Post("/component/*", registry.Handler)
+//
+// Example with gorilla/mux:
+//
+//	router.PathPrefix("/component/").HandlerFunc(registry.Handler).Methods("GET", "POST")
+//
+// Example with net/http:
+//
+//	http.HandleFunc("/component/", registry.Handler)
+//
+// For URL "/component/search", the component name will be "search".
+// For URL "/api/components/login", the component name will be "login".
+func (r *Registry) Handler(w http.ResponseWriter, req *http.Request) {
+	// Extract component name from URL path (last segment after last slash)
+	path := req.URL.Path
+	lastSlash := len(path)
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			lastSlash = i
+			break
+		}
+	}
+	componentName := path[lastSlash+1:]
+
+	// Remove trailing slash if present
+	if componentName == "" && lastSlash > 0 {
+		// Path ends with slash, try again
+		for i := lastSlash - 1; i >= 0; i-- {
+			if path[i] == '/' {
+				componentName = path[i+1 : lastSlash]
+				break
+			}
 		}
 	}
 
-	// Apply response headers (after processing, so we capture any changes made during Process)
-	applyHxResponseHeaders(w, instance.Interface())
-
-	// Render component
-	w.Header().Set("Content-Type", "text/html")
-	component := entry.render(instance.Interface())
-	if err := component.Render(req.Context(), w); err != nil {
-		slog.Error("component render error",
-			"component", componentName,
-			"error", err)
-		r.renderError(w, req, "Render Error", fmt.Sprintf("Component rendering failed: %v", err), http.StatusInternalServerError)
+	if componentName == "" {
+		slog.Warn("empty component name in URL path",
+			"path", req.URL.Path)
+		r.renderError(w, req, "Bad Request", "Component name cannot be empty", http.StatusBadRequest)
 		return
 	}
 
-	slog.Debug("component rendered successfully",
-		"component", componentName)
+	// Use HandlerFor to handle the actual request
+	r.HandlerFor(componentName)(w, req)
 }
 
 // renderError renders error responses using the configured error handler
 func (r *Registry) renderError(w http.ResponseWriter, req *http.Request, title string, message string, code int) {
 	r.errorHandler(w, req, title, message, code)
-}
-
-// Mount registers the handler with the chi router at GET and POST /component/{component_name}.
-// GET requests are useful for rendering components with initial/default state or query parameters.
-// POST requests are the standard HTMX pattern for form submissions.
-func (r *Registry) Mount(router *chi.Mux) {
-	router.Get("/component/{component_name}", r.Handler)
-	router.Post("/component/{component_name}", r.Handler)
 }

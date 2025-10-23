@@ -28,8 +28,9 @@ func main() {
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 
-	// Mount the component registry
-	registry.Mount(router)
+	// Mount component handlers with wildcard pattern
+	router.Get("/component/*", registry.Handler)
+	router.Post("/component/*", registry.Handler)
 
 	// Serve pages using templ
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {

@@ -58,7 +58,8 @@ func TestProcessorAndRedirect(t *testing.T) {
 
 	// Create router
 	router := chi.NewRouter()
-	registry.Mount(router)
+	router.Get("/component/*", registry.Handler)
+	router.Post("/component/*", registry.Handler)
 
 	// Test successful login with redirect
 	t.Run("successful login sets HX-Redirect header", func(t *testing.T) {
@@ -144,7 +145,8 @@ func TestHttpMethodInterface(t *testing.T) {
 	Register(registry, "test", testMethodComponent)
 
 	router := chi.NewRouter()
-	registry.Mount(router)
+	router.Get("/component/*", registry.Handler)
+	router.Post("/component/*", registry.Handler)
 
 	t.Run("POST request sets method", func(t *testing.T) {
 		formData := url.Values{}
@@ -173,4 +175,66 @@ func TestHttpMethodInterface(t *testing.T) {
 			t.Errorf("expected body to contain 'Method: GET', got: %s", body)
 		}
 	})
+}
+
+func TestHandlerURLExtraction(t *testing.T) {
+	registry := NewRegistry()
+	Register(registry, "search", testMethodComponent)
+	Register(registry, "login", renderTestLoginComponent)
+
+	tests := []struct {
+		name          string
+		url           string
+		expectedBody  string
+		expectedCode  int
+	}{
+		{
+			name:         "extract component from /component/search",
+			url:          "/component/search?q=test",
+			expectedBody: "Method: GET",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "extract component from /api/search",
+			url:          "/api/search?q=test",
+			expectedBody: "Method: GET",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "extract component from /search",
+			url:          "/search?q=test",
+			expectedBody: "Method: GET",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "extract component from nested path /api/v1/components/login",
+			url:          "/api/v1/components/login",
+			expectedBody: "error",
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "handle component not found",
+			url:          "/component/nonexistent",
+			expectedBody: "Component Not Found",
+			expectedCode: http.StatusNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			w := httptest.NewRecorder()
+
+			registry.Handler(w, req)
+
+			if w.Code != tt.expectedCode {
+				t.Errorf("expected status %d, got %d", tt.expectedCode, w.Code)
+			}
+
+			body := w.Body.String()
+			if !strings.Contains(body, tt.expectedBody) {
+				t.Errorf("expected body to contain '%s', got: %s", tt.expectedBody, body)
+			}
+		})
+	}
 }

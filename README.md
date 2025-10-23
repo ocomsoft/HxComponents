@@ -19,7 +19,6 @@ The HTMX Generic Component Registry eliminates repetitive handler code by provid
 - ✅ **Interface-based** - Optional HTMX headers via clean interfaces
 - ✅ **Framework agnostic** - Works with chi, gorilla/mux, net/http
 - ✅ **Composable** - Mix and match header interfaces as needed
-- ✅ **Battle-tested** - Minimal dependencies, uses reflection efficiently
 
 ## Quick Start
 
@@ -98,6 +97,133 @@ func main() {
 <button hx-get="/component/search?q=htmx&limit=10" hx-target="#results">
     Load Search Results
 </button>
+```
+
+## Router Integration
+
+The registry is framework-agnostic and works with any Go HTTP router or the standard library.
+
+### Using with chi (Wildcard Pattern)
+
+The simplest approach uses the `Handler` method with wildcard routing:
+
+```go
+package main
+
+import (
+    "github.com/go-chi/chi/v5"
+    "github.com/ocomsoft/HxComponents/components"
+)
+
+func main() {
+    registry := components.NewRegistry()
+    components.Register(registry, "search", mycomponent.Search)
+    components.Register(registry, "login", mycomponent.Login)
+
+    router := chi.NewRouter()
+
+    // Mount all components with wildcard pattern
+    router.Get("/component/*", registry.Handler)
+    router.Post("/component/*", registry.Handler)
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+The `Handler` method extracts the component name from the last segment of the URL path:
+- `/component/search` → component name: `search`
+- `/api/login` → component name: `login`
+- `/component/profile` → component name: `profile`
+
+### Using with chi (Specific URLs)
+
+For explicit control over each component URL, use `HandlerFor()`:
+
+```go
+router := chi.NewRouter()
+
+// Mount components at specific URLs
+router.Get("/search", registry.HandlerFor("search"))
+router.Post("/search", registry.HandlerFor("search"))
+
+router.Get("/login", registry.HandlerFor("login"))
+router.Post("/login", registry.HandlerFor("login"))
+```
+
+### Using with gorilla/mux
+
+```go
+package main
+
+import (
+    "github.com/gorilla/mux"
+    "github.com/ocomsoft/HxComponents/components"
+)
+
+func main() {
+    registry := components.NewRegistry()
+    components.Register(registry, "search", mycomponent.Search)
+    components.Register(registry, "login", mycomponent.Login)
+
+    router := mux.NewRouter()
+
+    // Option 1: Wildcard pattern (extracts component name from URL)
+    router.PathPrefix("/component/").HandlerFunc(registry.Handler).Methods("GET", "POST")
+
+    // Option 2: Specific URLs (explicit component names)
+    router.HandleFunc("/search", registry.HandlerFor("search")).Methods("GET", "POST")
+    router.HandleFunc("/login", registry.HandlerFor("login")).Methods("GET", "POST")
+
+    http.ListenAndServe(":8080", router)
+}
+```
+
+### Using with net/http (Standard Library)
+
+No router needed - use the standard library directly:
+
+```go
+package main
+
+import (
+    "net/http"
+    "github.com/ocomsoft/HxComponents/components"
+)
+
+func main() {
+    registry := components.NewRegistry()
+    components.Register(registry, "search", mycomponent.Search)
+    components.Register(registry, "login", mycomponent.Login)
+
+    // Option 1: Wildcard pattern (extracts component name from URL)
+    http.HandleFunc("/component/", registry.Handler)
+
+    // Option 2: Specific URLs (explicit component names)
+    http.HandleFunc("/search", registry.HandlerFor("search"))
+    http.HandleFunc("/login", registry.HandlerFor("login"))
+
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Mixing Components with Custom Handlers
+
+You can easily mix component handlers with your custom route handlers:
+
+```go
+router := chi.NewRouter()
+
+// Custom handlers
+router.Get("/", homePageHandler)
+router.Get("/about", aboutPageHandler)
+
+// Component handlers with wildcard
+router.Get("/component/*", registry.Handler)
+router.Post("/component/*", registry.Handler)
+
+// Or specific component URLs
+router.Get("/search", registry.HandlerFor("search"))
+router.Post("/search", registry.HandlerFor("search"))
 ```
 
 ## HTMX Request Headers
@@ -400,14 +526,41 @@ Creates a new component registry.
 Registers a component with type-safe rendering function.
 
 **Parameters:**
-- `name` - Component name used in URL path
+- `name` - Component name used to identify the component
 - `render` - Function that takes typed data and returns templ.Component
 
-#### `Mount(router *chi.Mux)`
-Mounts the registry handler to chi router at `/component/{component_name}`.
-
 #### `Handler(w http.ResponseWriter, req *http.Request)`
-HTTP handler for component rendering. Can be used with any router.
+Extracts the component name from the URL path and renders the component. The component name is extracted from the last segment of the URL path after the last slash. This allows for wildcard routing patterns.
+
+**Example:**
+```go
+// With chi
+router.Get("/component/*", registry.Handler)
+router.Post("/component/*", registry.Handler)
+
+// With gorilla/mux
+router.PathPrefix("/component/").HandlerFunc(registry.Handler).Methods("GET", "POST")
+
+// With net/http
+http.HandleFunc("/component/", registry.Handler)
+```
+
+**URL to Component Name Mapping:**
+- `/component/search` → `search`
+- `/api/login` → `login`
+- `/component/profile` → `profile`
+
+#### `HandlerFor(componentName string) http.HandlerFunc`
+Returns an http.HandlerFunc for rendering a specific component. Use this when you want explicit control over component URLs.
+
+**Parameters:**
+- `componentName` - The name of the registered component
+
+**Example:**
+```go
+http.HandleFunc("/search", registry.HandlerFor("search"))
+router.Get("/search", registry.HandlerFor("search"))
+```
 
 #### `SetErrorHandler(handler ErrorHandler)`
 Sets a custom error handler for rendering error responses.
