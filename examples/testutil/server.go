@@ -16,6 +16,7 @@ import (
 	"github.com/ocomsoft/HxComponents/examples/pages"
 	"github.com/ocomsoft/HxComponents/examples/profile"
 	"github.com/ocomsoft/HxComponents/examples/search"
+	"github.com/ocomsoft/HxComponents/examples/todolist"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,6 +40,7 @@ func NewTestServer(t *testing.T) *TestServer {
 	components.Register[*login.LoginComponent](registry, "login")
 	components.Register[*profile.ProfileComponent](registry, "profile")
 	components.Register[*counter.CounterComponent](registry, "counter")
+	components.Register[*todolist.TodoListComponent](registry, "todolist")
 
 	// Setup router
 	router := chi.NewRouter()

@@ -3,6 +3,7 @@ package pages
 import (
 	"github.com/ocomsoft/HxComponents/examples/search"
 	"github.com/ocomsoft/HxComponents/examples/counter"
+	"github.com/ocomsoft/HxComponents/examples/todolist"
 )
 
 templ IndexPage() {
@@ -36,6 +37,21 @@ templ IndexPage() {
 				<p style="margin-top: 10px; color: #666; font-size: 14px;">
 					The component above was rendered directly in this page template.
 					The same SearchComponent can also handle HTMX requests via <code>/component/search</code>
+				</p>
+
+				<h3 style="margin-top: 30px; color: #666;">TodoList Component - Event-Driven Demo</h3>
+				<p>This demonstrates the full event lifecycle with BeforeEvent → OnEvent → AfterEvent → Process → Render:</p>
+				@(&todolist.TodoListComponent{
+					Items: []todolist.TodoItem{
+						{ID: 1, Text: "Try adding a new item", Completed: false},
+						{ID: 2, Text: "Toggle an item as complete", Completed: false},
+						{ID: 3, Text: "Delete an item", Completed: false},
+					},
+				})
+				<p style="margin-top: 10px; color: #666; font-size: 14px;">
+					This TodoList uses the new event-driven pattern with <code>hxc-event</code> parameter.
+					Each button triggers a specific event handler (OnAddItem, OnToggleItem, OnDeleteItem, OnClearCompleted).
+					Check the browser console and server logs to see the lifecycle in action!
 				</p>
 			</div>
 			@examplesGrid()
@@ -158,6 +174,8 @@ templ introSection() {
 		<p>This page demonstrates the HTMX Generic Component Registry pattern. Each form below uses the same registry infrastructure with type-safe component rendering.</p>
 		<p><strong>Try the examples below:</strong></p>
 		<ul>
+			<li><strong>Counter:</strong> Simple event-driven component with increment/decrement events</li>
+			<li><strong>TodoList:</strong> Comprehensive event lifecycle demo (BeforeEvent → OnEvent → AfterEvent → Process)</li>
 			<li><strong>Search:</strong> Demonstrates request header capture (HX-Boosted, HX-Request, etc.)</li>
 			<li><strong>Login:</strong> Demonstrates response headers (HX-Redirect) - Use username: <code>demo</code>, password: <code>password</code></li>
 			<li><strong>Profile:</strong> Demonstrates complex form data with arrays</li>

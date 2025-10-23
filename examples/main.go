@@ -12,6 +12,7 @@ import (
 	"github.com/ocomsoft/HxComponents/examples/pages"
 	"github.com/ocomsoft/HxComponents/examples/profile"
 	"github.com/ocomsoft/HxComponents/examples/search"
+	"github.com/ocomsoft/HxComponents/examples/todolist"
 )
 
 func main() {
@@ -25,6 +26,7 @@ func main() {
 	components.Register[*login.LoginComponent](registry, "login")
 	components.Register[*profile.ProfileComponent](registry, "profile")
 	components.Register[*counter.CounterComponent](registry, "counter")
+	components.Register[*todolist.TodoListComponent](registry, "todolist")
 
 	// Setup router
 	router := chi.NewRouter()

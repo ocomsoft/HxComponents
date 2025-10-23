@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"github.com/ocomsoft/HxComponents/examples/counter"
 	"github.com/ocomsoft/HxComponents/examples/search"
+	"github.com/ocomsoft/HxComponents/examples/todolist"
 )
 
 func IndexPage() templ.Component {
@@ -66,7 +67,21 @@ func IndexPage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p style=\"margin-top: 10px; color: #666; font-size: 14px;\">The component above was rendered directly in this page template. The same SearchComponent can also handle HTMX requests via <code>/component/search</code></p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p style=\"margin-top: 10px; color: #666; font-size: 14px;\">The component above was rendered directly in this page template. The same SearchComponent can also handle HTMX requests via <code>/component/search</code></p><h3 style=\"margin-top: 30px; color: #666;\">TodoList Component - Event-Driven Demo</h3><p>This demonstrates the full event lifecycle with BeforeEvent → OnEvent → AfterEvent → Process → Render:</p>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = (&todolist.TodoListComponent{
+			Items: []todolist.TodoItem{
+				{ID: 1, Text: "Try adding a new item", Completed: false},
+				{ID: 2, Text: "Toggle an item as complete", Completed: false},
+				{ID: 3, Text: "Delete an item", Completed: false},
+			},
+		}).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p style=\"margin-top: 10px; color: #666; font-size: 14px;\">This TodoList uses the new event-driven pattern with <code>hxc-event</code> parameter. Each button triggers a specific event handler (OnAddItem, OnToggleItem, OnDeleteItem, OnClearCompleted). Check the browser console and server logs to see the lifecycle in action!</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -78,7 +93,7 @@ func IndexPage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -107,7 +122,7 @@ func styles() templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<style>\n\t\tbody {\n\t\t\tfont-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n\t\t\tmax-width: 1200px;\n\t\t\tmargin: 0 auto;\n\t\t\tpadding: 20px;\n\t\t\tbackground-color: #f5f5f5;\n\t\t}\n\t\t.container {\n\t\t\tbackground: white;\n\t\t\tborder-radius: 8px;\n\t\t\tpadding: 30px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tbox-shadow: 0 2px 4px rgba(0,0,0,0.1);\n\t\t}\n\t\th1 {\n\t\t\tcolor: #333;\n\t\t\tborder-bottom: 3px solid #007bff;\n\t\t\tpadding-bottom: 10px;\n\t\t}\n\t\th2 {\n\t\t\tcolor: #555;\n\t\t\tmargin-top: 0;\n\t\t}\n\t\t.form-group {\n\t\t\tmargin-bottom: 15px;\n\t\t}\n\t\tlabel {\n\t\t\tdisplay: block;\n\t\t\tmargin-bottom: 5px;\n\t\t\tfont-weight: 600;\n\t\t\tcolor: #555;\n\t\t}\n\t\tinput[type=\"text\"],\n\t\tinput[type=\"email\"],\n\t\tinput[type=\"password\"],\n\t\tinput[type=\"number\"] {\n\t\t\twidth: 100%;\n\t\t\tpadding: 10px;\n\t\t\tborder: 1px solid #ddd;\n\t\t\tborder-radius: 4px;\n\t\t\tbox-sizing: border-box;\n\t\t\tfont-size: 14px;\n\t\t}\n\t\tbutton {\n\t\t\tbackground-color: #007bff;\n\t\t\tcolor: white;\n\t\t\tpadding: 10px 20px;\n\t\t\tborder: none;\n\t\t\tborder-radius: 4px;\n\t\t\tcursor: pointer;\n\t\t\tfont-size: 16px;\n\t\t\tfont-weight: 600;\n\t\t}\n\t\tbutton:hover {\n\t\t\tbackground-color: #0056b3;\n\t\t}\n\t\t.result {\n\t\t\tmargin-top: 20px;\n\t\t\tpadding: 15px;\n\t\t\tbackground-color: #f8f9fa;\n\t\t\tborder-radius: 4px;\n\t\t\tmin-height: 50px;\n\t\t}\n\t\t.alert {\n\t\t\tpadding: 12px 20px;\n\t\t\tborder-radius: 4px;\n\t\t\tmargin-bottom: 15px;\n\t\t}\n\t\t.alert-success {\n\t\t\tbackground-color: #d4edda;\n\t\t\tborder: 1px solid #c3e6cb;\n\t\t\tcolor: #155724;\n\t\t}\n\t\t.alert-danger {\n\t\t\tbackground-color: #f8d7da;\n\t\t\tborder: 1px solid #f5c6cb;\n\t\t\tcolor: #721c24;\n\t\t}\n\t\t.alert-info {\n\t\t\tbackground-color: #d1ecf1;\n\t\t\tborder: 1px solid #bee5eb;\n\t\t\tcolor: #0c5460;\n\t\t}\n\t\t.alert-warning {\n\t\t\tbackground-color: #fff3cd;\n\t\t\tborder: 1px solid #ffeaa7;\n\t\t\tcolor: #856404;\n\t\t}\n\t\t.grid {\n\t\t\tdisplay: grid;\n\t\t\tgrid-template-columns: repeat(auto-fit, minmax(350px, 1fr));\n\t\t\tgap: 20px;\n\t\t}\n\t\t.info {\n\t\t\tfont-size: 14px;\n\t\t\tcolor: #666;\n\t\t\tfont-style: italic;\n\t\t}\n\t\tcode {\n\t\t\tbackground-color: #f4f4f4;\n\t\t\tpadding: 2px 6px;\n\t\t\tborder-radius: 3px;\n\t\t\tfont-family: 'Courier New', monospace;\n\t\t}\n\t</style>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<style>\n\t\tbody {\n\t\t\tfont-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;\n\t\t\tmax-width: 1200px;\n\t\t\tmargin: 0 auto;\n\t\t\tpadding: 20px;\n\t\t\tbackground-color: #f5f5f5;\n\t\t}\n\t\t.container {\n\t\t\tbackground: white;\n\t\t\tborder-radius: 8px;\n\t\t\tpadding: 30px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tbox-shadow: 0 2px 4px rgba(0,0,0,0.1);\n\t\t}\n\t\th1 {\n\t\t\tcolor: #333;\n\t\t\tborder-bottom: 3px solid #007bff;\n\t\t\tpadding-bottom: 10px;\n\t\t}\n\t\th2 {\n\t\t\tcolor: #555;\n\t\t\tmargin-top: 0;\n\t\t}\n\t\t.form-group {\n\t\t\tmargin-bottom: 15px;\n\t\t}\n\t\tlabel {\n\t\t\tdisplay: block;\n\t\t\tmargin-bottom: 5px;\n\t\t\tfont-weight: 600;\n\t\t\tcolor: #555;\n\t\t}\n\t\tinput[type=\"text\"],\n\t\tinput[type=\"email\"],\n\t\tinput[type=\"password\"],\n\t\tinput[type=\"number\"] {\n\t\t\twidth: 100%;\n\t\t\tpadding: 10px;\n\t\t\tborder: 1px solid #ddd;\n\t\t\tborder-radius: 4px;\n\t\t\tbox-sizing: border-box;\n\t\t\tfont-size: 14px;\n\t\t}\n\t\tbutton {\n\t\t\tbackground-color: #007bff;\n\t\t\tcolor: white;\n\t\t\tpadding: 10px 20px;\n\t\t\tborder: none;\n\t\t\tborder-radius: 4px;\n\t\t\tcursor: pointer;\n\t\t\tfont-size: 16px;\n\t\t\tfont-weight: 600;\n\t\t}\n\t\tbutton:hover {\n\t\t\tbackground-color: #0056b3;\n\t\t}\n\t\t.result {\n\t\t\tmargin-top: 20px;\n\t\t\tpadding: 15px;\n\t\t\tbackground-color: #f8f9fa;\n\t\t\tborder-radius: 4px;\n\t\t\tmin-height: 50px;\n\t\t}\n\t\t.alert {\n\t\t\tpadding: 12px 20px;\n\t\t\tborder-radius: 4px;\n\t\t\tmargin-bottom: 15px;\n\t\t}\n\t\t.alert-success {\n\t\t\tbackground-color: #d4edda;\n\t\t\tborder: 1px solid #c3e6cb;\n\t\t\tcolor: #155724;\n\t\t}\n\t\t.alert-danger {\n\t\t\tbackground-color: #f8d7da;\n\t\t\tborder: 1px solid #f5c6cb;\n\t\t\tcolor: #721c24;\n\t\t}\n\t\t.alert-info {\n\t\t\tbackground-color: #d1ecf1;\n\t\t\tborder: 1px solid #bee5eb;\n\t\t\tcolor: #0c5460;\n\t\t}\n\t\t.alert-warning {\n\t\t\tbackground-color: #fff3cd;\n\t\t\tborder: 1px solid #ffeaa7;\n\t\t\tcolor: #856404;\n\t\t}\n\t\t.grid {\n\t\t\tdisplay: grid;\n\t\t\tgrid-template-columns: repeat(auto-fit, minmax(350px, 1fr));\n\t\t\tgap: 20px;\n\t\t}\n\t\t.info {\n\t\t\tfont-size: 14px;\n\t\t\tcolor: #666;\n\t\t\tfont-style: italic;\n\t\t}\n\t\tcode {\n\t\t\tbackground-color: #f4f4f4;\n\t\t\tpadding: 2px 6px;\n\t\t\tborder-radius: 3px;\n\t\t\tfont-family: 'Courier New', monospace;\n\t\t}\n\t</style>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -136,7 +151,7 @@ func introSection() templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"container\"><p>This page demonstrates the HTMX Generic Component Registry pattern. Each form below uses the same registry infrastructure with type-safe component rendering.</p><p><strong>Try the examples below:</strong></p><ul><li><strong>Search:</strong> Demonstrates request header capture (HX-Boosted, HX-Request, etc.)</li><li><strong>Login:</strong> Demonstrates response headers (HX-Redirect) - Use username: <code>demo</code>, password: <code>password</code></li><li><strong>Profile:</strong> Demonstrates complex form data with arrays</li><li><strong>GET Support:</strong> Components can be loaded via GET requests with query parameters - <a href=\"#\" hx-get=\"/component/search?q=golang&limit=5\" hx-target=\"#get-demo\" style=\"color: #007bff; text-decoration: underline;\">Click here to demo</a></li></ul><div id=\"get-demo\" class=\"result\" style=\"margin-top: 15px;\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"container\"><p>This page demonstrates the HTMX Generic Component Registry pattern. Each form below uses the same registry infrastructure with type-safe component rendering.</p><p><strong>Try the examples below:</strong></p><ul><li><strong>Counter:</strong> Simple event-driven component with increment/decrement events</li><li><strong>TodoList:</strong> Comprehensive event lifecycle demo (BeforeEvent → OnEvent → AfterEvent → Process)</li><li><strong>Search:</strong> Demonstrates request header capture (HX-Boosted, HX-Request, etc.)</li><li><strong>Login:</strong> Demonstrates response headers (HX-Redirect) - Use username: <code>demo</code>, password: <code>password</code></li><li><strong>Profile:</strong> Demonstrates complex form data with arrays</li><li><strong>GET Support:</strong> Components can be loaded via GET requests with query parameters - <a href=\"#\" hx-get=\"/component/search?q=golang&limit=5\" hx-target=\"#get-demo\" style=\"color: #007bff; text-decoration: underline;\">Click here to demo</a></li></ul><div id=\"get-demo\" class=\"result\" style=\"margin-top: 15px;\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -165,7 +180,7 @@ func examplesGrid() templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"grid\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"grid\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -181,7 +196,7 @@ func examplesGrid() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -210,7 +225,7 @@ func searchExample() templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"container\"><h2>Search Component</h2><form hx-post=\"/component/search\" hx-target=\"#search-result\" hx-boost=\"true\"><div class=\"form-group\"><label for=\"search-query\">Search Query:</label> <input type=\"text\" id=\"search-query\" name=\"q\" placeholder=\"Enter search term\" value=\"htmx components\"></div><div class=\"form-group\"><label for=\"search-limit\">Result Limit:</label> <input type=\"number\" id=\"search-limit\" name=\"limit\" value=\"10\" min=\"1\" max=\"100\"></div><button type=\"submit\">Search</button></form><div id=\"search-result\" class=\"result\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"container\"><h2>Search Component</h2><form hx-post=\"/component/search\" hx-target=\"#search-result\" hx-boost=\"true\"><div class=\"form-group\"><label for=\"search-query\">Search Query:</label> <input type=\"text\" id=\"search-query\" name=\"q\" placeholder=\"Enter search term\" value=\"htmx components\"></div><div class=\"form-group\"><label for=\"search-limit\">Result Limit:</label> <input type=\"number\" id=\"search-limit\" name=\"limit\" value=\"10\" min=\"1\" max=\"100\"></div><button type=\"submit\">Search</button></form><div id=\"search-result\" class=\"result\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -239,7 +254,7 @@ func loginExample() templ.Component {
 			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"container\"><h2>Login Component</h2><form hx-post=\"/component/login\" hx-target=\"#login-result\"><div class=\"form-group\"><label for=\"username\">Username:</label> <input type=\"text\" id=\"username\" name=\"username\" placeholder=\"demo\"></div><div class=\"form-group\"><label for=\"password\">Password:</label> <input type=\"password\" id=\"password\" name=\"password\" placeholder=\"password\"></div><button type=\"submit\">Login</button></form><div id=\"login-result\" class=\"result\"></div><p class=\"info\">Hint: Use username \"demo\" and password \"password\" for successful login.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"container\"><h2>Login Component</h2><form hx-post=\"/component/login\" hx-target=\"#login-result\"><div class=\"form-group\"><label for=\"username\">Username:</label> <input type=\"text\" id=\"username\" name=\"username\" placeholder=\"demo\"></div><div class=\"form-group\"><label for=\"password\">Password:</label> <input type=\"password\" id=\"password\" name=\"password\" placeholder=\"password\"></div><button type=\"submit\">Login</button></form><div id=\"login-result\" class=\"result\"></div><p class=\"info\">Hint: Use username \"demo\" and password \"password\" for successful login.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -268,7 +283,7 @@ func profileExample() templ.Component {
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"container\"><h2>Profile Update Component</h2><form hx-post=\"/component/profile\" hx-target=\"#profile-result\"><div class=\"form-group\"><label for=\"name\">Name:</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"John Doe\"></div><div class=\"form-group\"><label for=\"email\">Email:</label> <input type=\"email\" id=\"email\" name=\"email\" placeholder=\"john@example.com\"></div><div class=\"form-group\"><label for=\"tags\">Tags (comma-separated):</label> <input type=\"text\" id=\"tags\" name=\"tags\" placeholder=\"developer, golang, htmx\"></div><button type=\"submit\">Update Profile</button></form><div id=\"profile-result\" class=\"result\"></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"container\"><h2>Profile Update Component</h2><form hx-post=\"/component/profile\" hx-target=\"#profile-result\"><div class=\"form-group\"><label for=\"name\">Name:</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"John Doe\"></div><div class=\"form-group\"><label for=\"email\">Email:</label> <input type=\"email\" id=\"email\" name=\"email\" placeholder=\"john@example.com\"></div><div class=\"form-group\"><label for=\"tags\">Tags (comma-separated):</label> <input type=\"text\" id=\"tags\" name=\"tags\" placeholder=\"developer, golang, htmx\"></div><button type=\"submit\">Update Profile</button></form><div id=\"profile-result\" class=\"result\"></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -297,20 +312,20 @@ func howItWorksSection() templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"container\" style=\"margin-top: 30px;\"><h2>How It Works</h2><p>Each component above is registered in the Go component registry with type-safe form binding and HTMX header handling:</p><ol><li>Forms submit to <code>/component/")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"container\" style=\"margin-top: 30px;\"><h2>How It Works</h2><p>Each component above is registered in the Go component registry with type-safe form binding and HTMX header handling:</p><ol><li>Forms submit to <code>/component/")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs("{component_name}")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages/index.templ`, Line: 242, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `examples/pages/index.templ`, Line: 260, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</code> via POST or GET</li><li>The registry parses form data (POST) or query parameters (GET) into typed structs</li><li>HTMX request headers are automatically captured (if component implements interfaces)</li><li>Component logic executes (validation, business logic, etc.)</li><li>HTMX response headers are set (redirects, triggers, etc.)</li><li>Template is rendered and returned to the target element</li></ol><p><strong>GET vs POST:</strong></p><ul><li><strong>POST</strong> - Standard HTMX pattern for form submissions with form data in request body</li><li><strong>GET</strong> - Useful for loading components with initial state via query parameters (e.g., <code>/component/search?q=golang&limit=5</code>)</li></ul></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</code> via POST or GET</li><li>The registry parses form data (POST) or query parameters (GET) into typed structs</li><li>HTMX request headers are automatically captured (if component implements interfaces)</li><li>Component logic executes (validation, business logic, etc.)</li><li>HTMX response headers are set (redirects, triggers, etc.)</li><li>Template is rendered and returned to the target element</li></ol><p><strong>GET vs POST:</strong></p><ul><li><strong>POST</strong> - Standard HTMX pattern for form submissions with form data in request body</li><li><strong>GET</strong> - Useful for loading components with initial state via query parameters (e.g., <code>/component/search?q=golang&limit=5</code>)</li></ul></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
