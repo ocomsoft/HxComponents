@@ -19,6 +19,37 @@ The HTMX Generic Component Registry eliminates repetitive handler code by provid
 - ✅ **Interface-based** - Optional HTMX headers via clean interfaces
 - ✅ **Framework agnostic** - Works with chi, gorilla/mux, net/http
 - ✅ **Composable** - Mix and match header interfaces as needed
+- ✅ **Dual-use components** - Same component works for HTMX requests AND server-side rendering
+
+## Why Package-Level Register Function?
+
+You might wonder why we use:
+```go
+components.Register[*MyComponent](registry, "name")
+```
+
+Instead of a method like:
+```go
+registry.Register[*MyComponent]("name")  // ❌ Not possible in Go
+```
+
+**Answer: Go methods cannot have type parameters.** This is a fundamental limitation of Go generics (as of Go 1.23).
+
+The Go team made this design decision because:
+1. **Method dispatch complexity** - Type parameters on methods would complicate dynamic dispatch
+2. **Interface implementation** - Would make it unclear how interfaces with generic methods work
+3. **Simplicity** - Keeps the type system simpler and more predictable
+
+So we use a **package-level generic function** instead, which is the idiomatic Go approach for generic operations that need access to a struct.
+
+**Alternative approaches we considered:**
+- **Builder pattern**: `registry.Component("name").As[*Type]()` - Still needs generic method ❌
+- **Reflection-only**: `registry.Register("name", &Component{})` - Loses type safety ❌
+- **Package function**: `components.Register[*Type](registry, "name")` - Works! ✅
+
+**Further reading:**
+- [Go Generics Proposal](https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#No-parameterized-methods)
+- [Why no type parameters on methods](https://github.com/golang/go/issues/49085)
 
 ## Quick Start
 

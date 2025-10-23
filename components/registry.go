@@ -62,6 +62,20 @@ func defaultErrorHandler(w http.ResponseWriter, req *http.Request, title string,
 // Example:
 //
 //	components.Register[*login.LoginComponent](registry, "login")
+//
+// Why is this a package-level function instead of a method on Registry?
+//
+// Go methods cannot have type parameters (as of Go 1.23). This is a fundamental
+// limitation of Go generics. The Go team made this design decision to avoid
+// complications with method dispatch, interface implementation, and type system complexity.
+//
+// We considered alternatives:
+//   - Builder pattern: registry.Component("name").As[*Type]() - Still needs generic method
+//   - Reflection-only: registry.Register("name", &Component{}) - Loses type safety
+//   - Package function: components.Register[*Type](registry, "name") - Works! ✅
+//
+// The package-level generic function is the idiomatic Go approach for this pattern.
+// See: https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md
 func Register[T templ.Component](r *Registry, name string) {
 	// Get the type - T is already a pointer type
 	var zero T
