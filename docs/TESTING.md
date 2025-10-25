@@ -2,6 +2,227 @@
 
 This guide covers strategies for testing HxComponents applications at multiple levels.
 
+## Test Helpers
+
+HxComponents provides built-in test helpers to simulate the component lifecycle without needing HTTP requests. These helpers are especially useful for unit testing components in isolation.
+
+### SimulateEvent
+
+The `SimulateEvent` helper simulates a complete event lifecycle, calling Init, BeforeEvent, the event handler, AfterEvent, and Process in the correct order. This is perfect for testing event handlers without setting up HTTP requests.
+
+```go
+package counter_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/ocomsoft/HxComponents/components"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCounterIncrement(t *testing.T) {
+	// Create component
+	counter := &counter.CounterComponent{Count: 5}
+	ctx := context.Background()
+
+	// Simulate increment event
+	err := components.SimulateEvent(ctx, counter, "increment")
+	require.NoError(t, err)
+
+	// Assert the count was incremented
+	assert.Equal(t, 6, counter.Count)
+}
+
+func TestMultipleEvents(t *testing.T) {
+	counter := &counter.CounterComponent{Count: 0}
+	ctx := context.Background()
+
+	// Simulate multiple clicks
+	for i := 0; i < 5; i++ {
+		err := components.SimulateEvent(ctx, counter, "increment")
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, 5, counter.Count)
+}
+```
+
+**Lifecycle executed by SimulateEvent:**
+1. `Init(ctx)` - if component implements `Initializer`
+2. `BeforeEvent(ctx, eventName)` - if component implements `BeforeEventHandler`
+3. `On{EventName}(ctx)` - the event handler method
+4. `AfterEvent(ctx, eventName)` - if component implements `AfterEventHandler`
+5. `Process(ctx)` - if component implements `Processor`
+
+### SimulateProcess
+
+The `SimulateProcess` helper simulates a non-event request (e.g., a simple GET or POST without an event). It calls Init and Process only.
+
+```go
+func TestFormProcessing(t *testing.T) {
+	form := &login.LoginComponent{
+		Username: "testuser",
+		Password: "password123",
+	}
+	ctx := context.Background()
+
+	err := components.SimulateProcess(ctx, form)
+	require.NoError(t, err)
+
+	// Assert redirect was set
+	assert.Equal(t, "/dashboard", form.RedirectTo)
+}
+```
+
+**Lifecycle executed by SimulateProcess:**
+1. `Init(ctx)` - if component implements `Initializer`
+2. `Process(ctx)` - if component implements `Processor`
+
+### Testing Lifecycle Hooks with Helpers
+
+The test helpers make it easy to verify that lifecycle hooks are called in the correct order:
+
+```go
+type TestComponent struct {
+	Value int
+	Log   []string
+}
+
+func (t *TestComponent) Init(ctx context.Context) error {
+	t.Log = append(t.Log, "Init")
+	if t.Value == 0 {
+		t.Value = 10
+	}
+	return nil
+}
+
+func (t *TestComponent) BeforeEvent(ctx context.Context, eventName string) error {
+	t.Log = append(t.Log, fmt.Sprintf("BeforeEvent:%s", eventName))
+	return nil
+}
+
+func (t *TestComponent) OnProcess(ctx context.Context) error {
+	t.Log = append(t.Log, "OnProcess")
+	t.Value++
+	return nil
+}
+
+func (t *TestComponent) AfterEvent(ctx context.Context, eventName string) error {
+	t.Log = append(t.Log, fmt.Sprintf("AfterEvent:%s", eventName))
+	return nil
+}
+
+func (t *TestComponent) Process(ctx context.Context) error {
+	t.Log = append(t.Log, "Process")
+	return nil
+}
+
+func (t *TestComponent) Render(ctx context.Context, w io.Writer) error {
+	fmt.Fprintf(w, "<div>%d</div>", t.Value)
+	return nil
+}
+
+func TestLifecycleOrder(t *testing.T) {
+	component := &TestComponent{Value: 0}
+	ctx := context.Background()
+
+	err := components.SimulateEvent(ctx, component, "process")
+	require.NoError(t, err)
+
+	// Verify lifecycle was executed in correct order
+	expected := []string{
+		"Init",
+		"BeforeEvent:process",
+		"OnProcess",
+		"AfterEvent:process",
+		"Process",
+	}
+	assert.Equal(t, expected, component.Log)
+
+	// Verify Init set default value, then OnProcess incremented it
+	assert.Equal(t, 11, component.Value)
+}
+```
+
+### Error Handling in Test Helpers
+
+The test helpers properly handle errors at each lifecycle stage:
+
+```go
+func TestErrorInBeforeEvent(t *testing.T) {
+	component := &MyComponent{
+		FailPhase: "before",
+	}
+	ctx := context.Background()
+
+	err := components.SimulateEvent(ctx, component, "submit")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "BeforeEvent failed")
+}
+
+func TestErrorInEventHandler(t *testing.T) {
+	component := &MyComponent{
+		FailPhase: "event",
+	}
+	ctx := context.Background()
+
+	err := components.SimulateEvent(ctx, component, "submit")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "event handler failed")
+
+	// Process should not have been called
+	assert.False(t, component.ProcessCalled)
+}
+```
+
+### When to Use Test Helpers vs HTTP Tests
+
+**Use SimulateEvent/SimulateProcess when:**
+- Testing component logic in isolation
+- Verifying lifecycle hook order
+- Running fast unit tests
+- Testing error conditions
+- You don't need to test HTTP-specific behavior
+
+**Use HTTP tests (httptest) when:**
+- Testing form parsing and decoding
+- Verifying HTTP headers (HTMX headers, redirects)
+- Testing the full HTTP request/response cycle
+- Integration testing with the registry
+
+```go
+// Fast unit test - uses SimulateEvent
+func TestCounterLogic(t *testing.T) {
+	counter := &counter.CounterComponent{Count: 5}
+	err := components.SimulateEvent(context.Background(), counter, "increment")
+	require.NoError(t, err)
+	assert.Equal(t, 6, counter.Count)
+}
+
+// Integration test - uses httptest
+func TestCounterHTTP(t *testing.T) {
+	registry := components.NewRegistry()
+	components.Register[*counter.CounterComponent](registry, "counter")
+
+	form := url.Values{}
+	form.Add("count", "5")
+	form.Add("hxc-event", "increment")
+
+	req := httptest.NewRequest(http.MethodPost, "/component/counter",
+		strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("HX-Request", "true")
+
+	w := httptest.NewRecorder()
+	registry.Handler(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "6")
+}
+```
+
 ## Unit Tests for Component Methods
 
 Test component logic in isolation:
